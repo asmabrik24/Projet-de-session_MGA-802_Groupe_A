@@ -3,7 +3,6 @@ Module : pre_traitement_donnees.py
 Prétraitement GPS / IMU complet
 """
 
-
 import pandas as pd
 
 
@@ -139,9 +138,9 @@ class Pretraitement:
         return self.donnees
 
     # =========================================================
-    # 6. EXPORT HDF5
+    # 6. EXPORT HDF5 : plus précise
     # =========================================================
-
+    
     def sauvegarder_hdf5(self, chemin, cle="donnees"):
         self.donnees.to_hdf(chemin, key=cle, mode="w")
 
