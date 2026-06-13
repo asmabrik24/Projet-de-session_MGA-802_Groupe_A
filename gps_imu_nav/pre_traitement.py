@@ -1,156 +1,143 @@
 """
-Module : pre_traitement_donnees.py
-Prétraitement GPS / IMU complet
+Module : processeur_donnees.py
+Description : Traitement des données GPS/IMU .
+Projet de Session - MGA802
 """
 
+import numpy as np
 import pandas as pd
 
+# =========================================================
+#                     GPS
+# =========================================================
 
-class Pretraitement:
+def preprocess_gps(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+
+    # normalisation colonnes
+    df.columns = df.columns.str.strip().str.lower()
+
+    # vérification colonnes
+    required = ["timestamp", "latitude", "longitude"]
+    for c in required:
+        if c not in df.columns:
+            raise ValueError(f"GPS manquant : {c}")
+
+    # conversion numérique
+    df["latitude"] = pd.to_numeric(df["latitude"], errors="coerce")
+    df["longitude"] = pd.to_numeric(df["longitude"], errors="coerce")
+
+    # suppression valeurs invalides
+    df = df.dropna(subset=["latitude", "longitude"])
+
+    # filtrage réaliste GPS
+    df = df[
+        df["latitude"].between(-90, 90) &
+        df["longitude"].between(-180, 180)
+    ]
+
+    # timestamp
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df = df.sort_values("timestamp")
+
+    # radians
+    df["latitude_rad"] = np.deg2rad(df["latitude"])
+    df["longitude_rad"] = np.deg2rad(df["longitude"])
+
+    print("[OK] GPS prétraité")
+
+    return df
+
+
+# =========================================================
+#                     IMU
+# =========================================================
+
+def preprocess_imu(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+
+    # normalisation colonnes
+    df.columns = df.columns.str.strip().str.lower()
+
+    # mapping automatique (compatible IMUAcquisition)
+    mapping = {
+        "ax": ["ax", "accx", "acc_x", "acceleration x", "accelerationx", "linear acceleration x"],
+        "ay": ["ay", "accy", "acc_y", "acceleration y", "accelerationy", "linear acceleration y"],
+        "az": ["az", "accz", "acc_z", "acceleration z", "accelerationz", "linear acceleration z"],
+        "gx": ["gx", "gyrox", "gyro x"],
+        "gy": ["gy", "gyroy", "gyro y"],
+        "gz": ["gz", "gyroz", "gyro z"]
+    }
+
+    for target, variants in mapping.items():
+        for v in variants:
+            if v in df.columns:
+                df[target] = df[v]
+                break
+
+    required = ["ax", "ay", "az", "gx", "gy", "gz"]
+
+    missing = [c for c in required if c not in df.columns]
+    if missing:
+        print("[ERROR] Colonnes IMU manquantes :", missing)
+        print("[DEBUG] Colonnes disponibles :", list(df.columns))
+        raise ValueError("Format IMU incorrect")
+
+    # conversion numérique
+    for c in required:
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+
+    # suppression NaN
+    df = df.dropna(subset=required)
+
+    # filtrage bruit (3 sigma)
+    for c in ["ax", "ay", "az"]:
+        m, s = df[c].mean(), df[c].std()
+        df = df[(df[c] > m - 3*s) & (df[c] < m + 3*s)]
+
+    # lissage
+    df["ax_f"] = df["ax"].rolling(5, center=True).mean()
+    df["ay_f"] = df["ay"].rolling(5, center=True).mean()
+    df["az_f"] = df["az"].rolling(5, center=True).mean()
+
+    df[["ax_f", "ay_f", "az_f"]] = df[["ax_f", "ay_f", "az_f"]].bfill()
+
+    # norme accélération
+    df["acc_norm"] = np.sqrt(df["ax_f"]**2 + df["ay_f"]**2 + df["az_f"]**2)
+
+    # timestamp
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df = df.sort_values("timestamp")
+
+    print("[OK] IMU prétraitée")
+
+    return df
+
+
+# =========================================================
+#                 SYNCHRONISATION
+# =========================================================
+
+def synchronize_data(gps: pd.DataFrame, imu: pd.DataFrame):
     """
-    Pipeline complet GPS / IMU :
-    - vérification colonnes
-    - nettoyage
-    - conversion unités
-    - synchronisation
-    - export HDF5
+    Fusion temporelle GPS + IMU
     """
 
-    # =========================================================
-    # INITIALISATION
-    # =========================================================
+    if imu is None:
+        print("[WARN] IMU absente → GPS seul")
+        return gps
 
-    def __init__(self, donnees: pd.DataFrame):
-        self.donnees = donnees.copy()
+    gps = gps.sort_values("timestamp")
+    imu = imu.sort_values("timestamp")
 
-    # =========================================================
-    # 1. VERIFICATION COLONNES
-    # =========================================================
+    merged = pd.merge_asof(
+        gps,
+        imu,
+        on="timestamp",
+        direction="nearest",
+        tolerance=pd.Timedelta("100ms")
+    )
 
-    def verifier_colonnes(self):
-        """
-        Vérifie la présence des colonnes GPS et IMU.
-        """
+    print("[OK] Synchronisation GPS + IMU réalisée")
 
-        colonnes_gps = ["timestamp", "latitude", "longitude"]
-        colonnes_imu = ["ax", "ay", "az", "gx", "gy", "gz"]
-
-        manquantes = []
-
-        for col in colonnes_gps + colonnes_imu:
-            if col not in self.donnees.columns:
-                manquantes.append(col)
-
-        if manquantes:
-            raise ValueError(f"Colonnes manquantes : {manquantes}")
-
-        return self.donnees
-
-    # =========================================================
-    # 2. NETTOYAGE
-    # =========================================================
-
-    def nettoyer(self):
-        """
-        Nettoyage des données.
-        """
-
-        self.donnees = self.donnees.drop_duplicates()
-
-        # valeurs manquantes
-        self.donnees = self.donnees.interpolate(method="linear")
-
-        if self.donnees.isnull().any().any():
-            self.donnees = self.donnees.fillna(method="ffill").fillna(method="bfill")
-
-        return self.donnees
-
-    # =========================================================
-    # 3. CONVERSION UNITES
-    # =========================================================
-
-    def convertir_unites(self):
-        """
-        Conversion typique IMU + GPS :
-        - degrés → radians
-        - accélération m/s² → g
-        """
-
-        import numpy as np
-
-        # GPS (si besoin)
-        if "latitude" in self.donnees.columns:
-            self.donnees["latitude"] = np.radians(self.donnees["latitude"])
-        if "longitude" in self.donnees.columns:
-            self.donnees["longitude"] = np.radians(self.donnees["longitude"])
-
-        # IMU acceleration (m/s² → g)
-        for col in ["ax", "ay", "az"]:
-            if col in self.donnees.columns:
-                self.donnees[col] = self.donnees[col] / 9.81
-
-        return self.donnees
-
-    # =========================================================
-    # 4. SYNCHRONISATION GPS / IMU
-    # =========================================================
-
-    def synchroniser(self, freq="100ms"):
-        """
-        Synchronisation temporelle via timestamp.
-
-        Hypothèse :
-        - GPS plus lent
-        - IMU plus rapide
-
-        On resample sur une base commune.
-        """
-
-        self.donnees["timestamp"] = pd.to_datetime(self.donnees["timestamp"])
-        self.donnees = self.donnees.set_index("timestamp")
-
-        # resampling temporel
-        self.donnees = self.donnees.resample(freq).mean()
-
-        # interpolation après resample
-        self.donnees = self.donnees.interpolate()
-
-        return self.donnees.reset_index()
-
-    # =========================================================
-    # 5. NORMALISATION
-    # =========================================================
-
-    def normaliser(self):
-        """
-        Normalisation Min-Max.
-        """
-
-        colonnes = self.donnees.select_dtypes(include="number").columns
-
-        for col in colonnes:
-            min_val = self.donnees[col].min()
-            max_val = self.donnees[col].max()
-
-            if max_val != min_val:
-                self.donnees[col] = (self.donnees[col] - min_val) / (max_val - min_val)
-
-        return self.donnees
-
-    # =========================================================
-    # 6. EXPORT HDF5 : plus précise
-    # =========================================================
-    
-    def sauvegarder_hdf5(self, chemin, cle="donnees"):
-        self.donnees.to_hdf(chemin, key=cle, mode="w")
-
-    @staticmethod
-    def charger_hdf5(chemin, cle="donnees"):
-        return pd.read_hdf(chemin, key=cle)
-
-    # =========================================================
-    # GETTER FINAL
-    # =========================================================
-
-    def obtenir_donnees(self):
-        return self.donnees
+    return merged
