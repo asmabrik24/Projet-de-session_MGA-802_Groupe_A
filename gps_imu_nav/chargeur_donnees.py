@@ -1,6 +1,6 @@
 """
 Module : chargeur_donnees.py
-Description : Chargement robuste et validation des fichiers Excel GPS et IMU.
+Description : Chargement et validation des fichiers Excel (.xlsx) réimportés.
 Projet de Session - MGA802
 """
 
@@ -8,119 +8,82 @@ from pathlib import Path
 import pandas as pd
 
 
-def charger_donnees_brutes(chemin_gps: str, chemin_imu: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+class ChargeurDonnees:
     """
-    Charger et valider les données GPS et IMU.
-    1- Charger le fichier Excel
-    2- Vérifier les colonnes GPS/IMU nécessaires
+    Classe responsable du chargement des données GPS / IMU.
+
+    Objectif :
+    - centraliser l'accès aux fichiers de données
+    - garantir la validité des fichiers
+    - éviter les erreurs en amont du pipeline
     """
 
-    chemin_gps = Path(chemin_gps)
-    chemin_imu = Path(chemin_imu)
+    def __init__(self, chemin_fichier: str):
+        # Conversion en Path pour une meilleure gestion des chemins
+        self.chemin_fichier = Path(chemin_fichier)
 
-    # Vérification de l'existence des fichiers
-    if not chemin_gps.exists():
-        raise FileNotFoundError(
-            f"Le fichier GPS est introuvable :\n{chemin_gps.resolve()}"
-        )
+        # Stockage des données après chargement
+        self.donnees = None
 
-    if not chemin_imu.exists():
-        raise FileNotFoundError(
-            f"Le fichier IMU est introuvable :\n{chemin_imu.resolve()}"
-        )
+        # Validation immédiate du fichier dès l'initialisation
+        self._verifier_chemin()
 
-    print("Chargement des fichiers Excel...")
+    def _verifier_chemin(self):
+        """
+        Vérifie que :
+        - le fichier existe
+        - le format est supporté
+        """
 
-    # Lecture des fichiers Excel
-    df_gps = pd.read_excel(chemin_gps)
-    df_imu = pd.read_excel(chemin_imu)
-
-    # Nettoyage des noms de colonnes
-    df_gps.columns = df_gps.columns.str.strip()
-    df_imu.columns = df_imu.columns.str.strip()
-
-    print("\nColonnes GPS trouvées :")
-    print(list(df_gps.columns))
-
-    print("\nColonnes IMU trouvées :")
-    print(list(df_imu.columns))
-
-    # Colonnes attendues
-    colonnes_gps_requises = [
-        "Timestamp",
-        "Latitude",
-        "Longitude",
-        "Altitude",
-        "Vitesse Nord",
-        "Vitesse Est",
-    ]
-
-    colonnes_imu_requises = [
-        "Timestamp",
-        "Yaw",
-        "Pitch",
-        "Roll",
-        "Accel_X",
-        "Accel_Y",
-        "Accel_Z",
-    ]
-
-    # Validation GPS
-    for col in colonnes_gps_requises:
-        if col not in df_gps.columns:
-            raise KeyError(
-                f"Colonne GPS manquante : '{col}'\n"
-                f"Colonnes disponibles : {list(df_gps.columns)}"
+        if not self.chemin_fichier.exists():
+            raise FileNotFoundError(
+                f"Erreur : fichier introuvable -> {self.chemin_fichier}"
             )
 
-    # Validation IMU
-    for col in colonnes_imu_requises:
-        if col not in df_imu.columns:
-            raise KeyError(
-                f"Colonne IMU manquante : '{col}'\n"
-                f"Colonnes disponibles : {list(df_imu.columns)}"
+        # On limite volontairement les formats pour simplifier le pipeline
+        if self.chemin_fichier.suffix not in [".csv", ".xlsx"]:
+            raise ValueError(
+                "Format non supporté. Utiliser CSV ou XLSX uniquement."
             )
 
-    print("\nValidation des colonnes réussie.")
+    def charger(self):
+        """
+        Charge les données selon le type de fichier.
 
-    return (
-        df_gps[colonnes_gps_requises],
-        df_imu[colonnes_imu_requises],
-    )
+        Retour :
+        - DataFrame pandas contenant les données brutes
+        """
 
+        # Lecture conditionnelle selon extension
+        if self.chemin_fichier.suffix == ".csv":
+            self.donnees = pd.read_csv(self.chemin_fichier)
 
-# ============================================================================
-# TEST LOCAL
-# ============================================================================
+        else:
+            self.donnees = pd.read_excel(self.chemin_fichier)
 
-if __name__ == "__main__":
+        # Validation après chargement pour garantir intégrité
+        self._valider_donnees()
 
-    print("Répertoire courant :", Path.cwd())
+        return self.donnees
 
-    # Projet-de-session_MGA-802_Groupe_A
-    racine_projet = Path(__file__).resolve().parent.parent
+    def _valider_donnees(self):
+        """
+        Vérifie la qualité minimale des données :
+        - non vide
+        - colonnes non totalement nulles
+        """
 
-    test_gps = racine_projet / "données" / "gps_locatisation.xlsx"
-    test_imu = racine_projet / "données" / "IMUAcquisition.xlsx"
+        if self.donnees is None or self.donnees.empty:
+            raise ValueError("Les données chargées sont vides")
 
-    print("\nChemin GPS :", test_gps)
-    print("Chemin IMU :", test_imu)
+        # Détection de colonnes totalement invalides
+        if self.donnees.isnull().all().any():
+            raise ValueError(
+                "Certaines colonnes contiennent uniquement des valeurs nulles"
+            )
 
-    try:
-        df_gps_brut, df_imu_brut = charger_donnees_brutes(
-            test_gps,
-            test_imu
-        )
-
-        print("\n=== CHARGEMENT RÉUSSI ===")
-        print(f"Lignes GPS : {len(df_gps_brut)}")
-        print(f"Lignes IMU : {len(df_imu_brut)}")
-
-        print("\nAperçu GPS :")
-        print(df_gps_brut.head())
-
-        print("\nAperçu IMU :")
-        print(df_imu_brut.head())
-
-    except Exception as e:
-        print(f"\n[ERREUR] {e}")
+    def obtenir_donnees(self):
+        """
+        Accées aux données chargées.
+        """
+        return self.donnees
