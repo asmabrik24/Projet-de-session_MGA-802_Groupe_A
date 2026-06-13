@@ -57,7 +57,16 @@ def preprocess_imu(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
     # normalisation colonnes
-    df.columns = df.columns.str.strip().str.lower()
+    df.columns = df.columns.str.lower()
+
+    df = df.rename(columns={
+        "accel_x": "ax",
+        "accel_y": "ay",
+        "accel_z": "az",
+        "gyro_x": "gx",
+        "gyro_y": "gy",
+        "gyro_z": "gz"
+    })
 
     # mapping automatique (compatible IMUAcquisition)
     mapping = {
