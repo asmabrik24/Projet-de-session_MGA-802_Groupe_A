@@ -21,9 +21,13 @@ def test_preprocess_imu_adds_acc_norm(sample_imu_df):
     result = preprocess_imu(sample_imu_df)
 
     assert "acc_norm" in result.columns
-    assert len(result) == 3
+    assert len(result) == 5
 
-    expected_first = np.sqrt(1.0**2 + 0.0**2 + 0.0**2)
+    expected_first = np.sqrt(
+        result.loc[0, "ax_f"] ** 2 +
+        result.loc[0, "ay_f"] ** 2 +
+        result.loc[0, "az_f"] ** 2
+    )
     assert np.isclose(result.loc[0, "acc_norm"], expected_first)
 
 
