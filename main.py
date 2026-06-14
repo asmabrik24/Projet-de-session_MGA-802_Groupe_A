@@ -36,7 +36,9 @@ def main():
     # 0. DÉFINITION DES CHEMINS
     # =====================================================
     # Centralisation des chemins pour faciliter la maintenance
-    base_path = r"C:\Users\21653\Desktop\ETs\MGA802_Programmation\Projet-de-session_MGA-802_Groupe_A\données"
+    # On part du dossier contenant ce fichier `main.py` pour rendre le projet portable.
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    base_path = os.path.join(project_root, "données")
 
     path_gps = os.path.join(base_path, "gps_locatisation.xlsx")
     path_imu = os.path.join(base_path, "IMUAcquisition.xlsx")
@@ -47,6 +49,8 @@ def main():
     print("\n====================================")
     print(" PIPELINE FUSION GPS + IMU")
     print("====================================\n")
+    print(f"[INFO] Dossier projet : {project_root}")
+    print(f"[INFO] Dossier données : {base_path}\n")
 
     # =====================================================
     # 2. CHARGEMENT DES DONNÉES BRUTES
@@ -57,7 +61,7 @@ def main():
 
     # ---- GPS ----
     if not os.path.exists(path_gps):
-        print("[ERROR] Fichier GPS introuvable")
+        print(f"[ERROR] Fichier GPS introuvable : {path_gps}")
         return
 
     gps = pd.read_excel(path_gps)
@@ -72,7 +76,7 @@ def main():
         # Debug important pour validation des colonnes IMU
         print("[DEBUG] Colonnes IMU :", list(imu.columns))
     else:
-        print("[WARN] IMU absent → traitement GPS uniquement")
+        print(f"[WARN] IMU absent → traitement GPS uniquement | chemin attendu : {path_imu}")
 
     # =====================================================
     # 3. PRÉTRAITEMENT DES DONNÉES GPS
