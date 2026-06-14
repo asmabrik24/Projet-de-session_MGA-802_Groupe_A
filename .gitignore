@@ -216,3 +216,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Fichiers macOS
+.DS_Store
+
+# Fichiers PyCharm
+.idea/
+
+# Données générées localement
+/données/*.csv
+/données/*.pkl
