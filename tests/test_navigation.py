@@ -87,6 +87,55 @@ def test_run_navigation_returns_dataframe(tmp_path, sample_navigation_df):
     assert isinstance(result, pd.DataFrame)
     assert output_path.exists()
     assert "x_fused" in result.columns
+
+def test_load_navigation_dataset_raises_when_file_missing(tmp_path):
+    missing_path = tmp_path / "missing_dataset.pkl"
+
+    with pytest.raises(FileNotFoundError):
+        load_navigation_dataset(missing_path)
+
+def test_compute_gps_trajectory_sets_local_origin(sample_navigation_df):
+    result = compute_gps_trajectory(sample_navigation_df)
+
+    assert result.loc[0, "x_gps"] == pytest.approx(0.0)
+    assert result.loc[0, "y_gps"] == pytest.approx(0.0)
+    assert result.loc[0, "z_gps"] == pytest.approx(0.0)
+
+def test_compute_gps_trajectory_raises_if_required_columns_missing(sample_navigation_df):
+    bad_df = sample_navigation_df.drop(columns=["latitude"])
+
+    with pytest.raises(ValueError):
+        compute_gps_trajectory(bad_df)
+
+def test_compute_imu_trajectory_returns_no_nan(sample_navigation_df):
+    result = compute_imu_trajectory(sample_navigation_df)
+
+    assert not result[["x_imu", "y_imu", "vx_imu", "vy_imu"]].isna().any().any()
+
+def test_compute_imu_trajectory_raises_if_required_columns_missing(sample_navigation_df):
+    bad_df = sample_navigation_df.drop(columns=["ax_f"])
+
+    with pytest.raises(ValueError):
+        compute_imu_trajectory(bad_df)
+
+def test_compute_simple_fusion_starts_from_gps_reference(sample_navigation_df):
+    gps = compute_gps_trajectory(sample_navigation_df)
+    imu = compute_imu_trajectory(sample_navigation_df)
+
+    result = compute_simple_fusion(gps, imu, alpha=0.7)
+
+    assert result.loc[0, "x_fused"] == pytest.approx(result.loc[0, "x_gps"])
+    assert result.loc[0, "y_fused"] == pytest.approx(result.loc[0, "y_gps"])
+
+def test_compute_simple_fusion_returns_no_nan(sample_navigation_df):
+    gps = compute_gps_trajectory(sample_navigation_df)
+    imu = compute_imu_trajectory(sample_navigation_df)
+
+    result = compute_simple_fusion(gps, imu, alpha=0.7)
+
+    fused_columns = [col for col in ["x_fused", "y_fused", "vx_fused", "vy_fused"] if col in result.columns]
+    assert not result[fused_columns].isna().any().any()
+
 @pytest.fixture
 def sample_imu_df():
     return pd.DataFrame({
