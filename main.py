@@ -14,6 +14,11 @@ from gps_imu_nav.metrics import compute_position_errors, summarize_error_statist
 
 
 def main() -> None:
+    """Point d'entree principal du projet MGA802."""
+    ui = UserInterface()
+    config = ui.get_user_config()
+
+
     pipeline = FusionPipeline()
     pipeline.run()
 
