@@ -6,7 +6,10 @@ from gps_imu_nav.visualization import (
     plot_velocities,
     summarize_navigation_results,
 )
-
+from gps_imu_nav.user_interface import UserInterface
+from gps_imu_nav.gps_outage import GPSOutageSimulator
+from gps_imu_nav.evaluator import Evaluator
+from gps_imu_nav.graphique import Graphique
 
 # =========================================================
 #                DESCRIPTION DU PROJET
@@ -31,11 +34,50 @@ Démarche générale :
 
 
 def main() -> None:
+    """Point d'entree principal du projet MGA802."""
+    ui = UserInterface()
+    config = ui.get_user_config()
+
+
     pipeline = FusionPipeline()
     pipeline.run()
 
     navigation_results = run_navigation(alpha=0.7, save_output=True)
     plot_gps_trajectory_only(navigation_results, save_figure=True, show_plot=True)
+    gps_outage = GPSOutageSimulator(navigation_results)
+
+    navigation_results = gps_outage.simulate_outage(
+        start_time=10,
+        duration=5
+
+    )
+
+    evaluator = Evaluator()
+
+    navigation_results, rmse_results = evaluator.evaluate_all_available(
+        navigation_results
+    )
+
+    graphique = Graphique()
+
+    graphique.plot_gps_outage(
+        navigation_results,
+        save_figure=True,
+        show_plot=True
+    )
+
+    graphique.plot_position_errors(
+        navigation_results,
+        save_figure=True,
+        show_plot=True
+    )
+
+    graphique.plot_rmse_comparison(
+        rmse_results,
+        save_figure=True,
+        show_plot=True
+    )
+
     print("\n====================================")
     print("TRAJECTOIRES ESTIMÉES")
     print("====================================\n")
@@ -49,6 +91,39 @@ def main() -> None:
     print("RÉSUMÉ NAVIGATION")
     print("====================================\n")
     print(summary)
+
+    # =====================================================
+    # INTERACTION UTILISATEUR
+    # =====================================================
+
+    print("\n====================================")
+    print("PARAMÈTRES UTILISATEUR")
+    print("====================================\n")
+
+    mode = input(
+        "Mode de navigation (GPS / IMU / FUSION) : "
+    ).upper()
+
+    outage_duration = float(
+        input("Durée de la panne GPS simulée (s) : ")
+    )
+
+    afficher_graphiques = input(
+        "Afficher les graphiques ? (o/n) : "
+    ).lower()
+
+    afficher_resultats = input(
+        "Afficher les résultats numériques ? (o/n) : "
+    ).lower()
+
+    print("\n====================================")
+    print("CHOIX UTILISATEUR")
+    print("====================================\n")
+
+    print(f"Mode sélectionné : {mode}")
+    print(f"Durée panne GPS : {outage_duration} s")
+    print(f"Afficher graphiques : {afficher_graphiques}")
+    print(f"Afficher résultats : {afficher_resultats}")
 
 
 if __name__ == "__main__":
