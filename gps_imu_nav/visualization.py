@@ -110,7 +110,7 @@ def plot_trajectories(
     plt.axis("equal")
     plt.xlabel("Position x [m]")
     plt.ylabel("Position y [m]")
-    plt.title("Trajectoire utile : GPS et fusion")
+    plt.title("Trajectoire filtrée : GPS et fusion GPS/IMU")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
@@ -347,7 +347,7 @@ def plot_scenario2_trajectory(
         final_output_path = (
             Path(output_path)
             if output_path is not None
-            else get_figures_dir() / "S2_trajectory_outage.png"
+            else get_figures_dir() / "trajectoire_pendant_panne_gps.png"
         )
         plt.savefig(final_output_path, dpi=300, bbox_inches="tight")
 
@@ -385,9 +385,9 @@ def plot_scenario2_drift(
     axes[1].plot(df.loc[mask_imu, "t_outage"], df.loc[mask_imu, "s2_err_y"], label="East")
     if "s2_err_z" in df.columns:
         axes[1].plot(df.loc[mask_imu, "t_outage"], df.loc[mask_imu, "s2_err_z"], label="Down")
-    axes[1].set_title("NED Error Components after GPS Outage")
-    axes[1].set_xlabel("Time since GPS outage (s)")
-    axes[1].set_ylabel("Position Error (m)")
+    axes[1].set_title("Évolution des composantes de l'erreur NED après une panne GPS")
+    axes[1].set_xlabel("Temps écoulé depuis la panne GPS [s]")
+    axes[1].set_ylabel("Erreur de position [m]")
     axes[1].grid(True)
     axes[1].legend()
 
@@ -398,7 +398,7 @@ def plot_scenario2_drift(
         final_output_path = (
             Path(output_path)
             if output_path is not None
-            else get_figures_dir() / "S2_drift_analysis.png"
+            else get_figures_dir() / "analyse_derive_imu.png"
         )
         plt.savefig(final_output_path, dpi=300, bbox_inches="tight")
 
@@ -449,16 +449,16 @@ def plot_scenario2_navigation_states(
 
     axes[0].plot(df["time_s"], df["horizontal_speed"])
     axes[0].axvline(outage_start_s, linestyle="--", color="black", label="GPS Outage")
-    axes[0].set_title("Horizontal Speed Estimate")
-    axes[0].set_ylabel("Horizontal Speed (m/s)")
+    axes[0].set_title("Estimation de la vitesse horizontale")
+    axes[0].set_ylabel("Vitesse horizontale (m/s)")
     axes[0].grid(True)
     axes[0].legend()
 
     axes[1].plot(df["time_s"], df["heading_plot"])
     axes[1].axvline(outage_start_s, linestyle="--", color="black", label="GPS Outage")
-    axes[1].set_title("Heading (Yaw) Estimate")
-    axes[1].set_xlabel("Time (s)")
-    axes[1].set_ylabel("Yaw / Heading (deg)")
+    axes[1].set_title("Estimation du cap (lacet)")
+    axes[1].set_xlabel("Temps (s)")
+    axes[1].set_ylabel("Angle de lacet (yaw) [°]")
     axes[1].grid(True)
     axes[1].legend()
 
