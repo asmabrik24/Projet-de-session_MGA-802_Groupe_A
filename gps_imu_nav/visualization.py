@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 
@@ -278,3 +279,199 @@ def summarize_navigation_results(navigation_results: pd.DataFrame) -> pd.DataFra
     })
 
     return summary
+
+def plot_scenario2_trajectory(
+    scenario2_df: pd.DataFrame,
+    outage_start_s: float = 30.0,
+    save_figure: bool = True,
+    output_path: str | os.PathLike | None = None,
+    show_plot: bool = True,
+) -> Path | None:
+    required = ["x_gps", "y_gps", "x_s2", "y_s2", "gps_available", "time_s"]
+    missing = [col for col in required if col not in scenario2_df.columns]
+    if missing:
+        raise ValueError(f"Colonnes manquantes pour la figure scénario 2 : {missing}")
+
+    df = scenario2_df.copy()
+
+    plt.figure(figsize=(10, 6))
+
+    plt.plot(
+        df["x_gps"],
+        df["y_gps"],
+        label="GPS référence",
+        linewidth=2,
+        linestyle="--",
+        marker="o",
+        markersize=2,
+    )
+
+    mask_fusion = df["gps_available"]
+    mask_imu = ~df["gps_available"]
+
+    plt.plot(
+        df.loc[mask_fusion, "x_s2"],
+        df.loc[mask_fusion, "y_s2"],
+        label="GPS+IMU Fusion (0–30 s)",
+        linewidth=2,
+    )
+
+    plt.plot(
+        df.loc[mask_imu, "x_s2"],
+        df.loc[mask_imu, "y_s2"],
+        label="IMU-only Dead Reckoning (> 30 s)",
+        linewidth=2,
+    )
+
+    idx_outage = (df["time_s"] - outage_start_s).abs().idxmin()
+
+    plt.scatter(df["x_gps"].iloc[0], df["y_gps"].iloc[0], marker="s", s=60, label="Start")
+    plt.scatter(df["x_s2"].iloc[-1], df["y_s2"].iloc[-1], marker="^", s=70, label="End")
+    plt.scatter(
+        df.loc[idx_outage, "x_gps"],
+        df.loc[idx_outage, "y_gps"],
+        marker="v",
+        s=70,
+        label="GPS Outage Point",
+    )
+
+    plt.xlabel("East (m)")
+    plt.ylabel("North (m)")
+    plt.title("Scenario 2 — 2D Trajectory: GPS Outage after 30 s")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+
+    final_output_path = None
+    if save_figure:
+        final_output_path = (
+            Path(output_path)
+            if output_path is not None
+            else get_figures_dir() / "S2_trajectory_outage.png"
+        )
+        plt.savefig(final_output_path, dpi=300, bbox_inches="tight")
+
+    _safe_show_or_close(show_plot)
+    return final_output_path
+
+
+def plot_scenario2_drift(
+    scenario2_df: pd.DataFrame,
+    save_figure: bool = True,
+    output_path: str | os.PathLike | None = None,
+    show_plot: bool = True,
+) -> Path | None:
+    required = ["time_s", "t_outage", "gps_available", "s2_err_2d", "s2_err_x", "s2_err_y"]
+    missing = [col for col in required if col not in scenario2_df.columns]
+    if missing:
+        raise ValueError(f"Colonnes manquantes pour la dérive scénario 2 : {missing}")
+
+    df = scenario2_df.copy()
+
+    fig, axes = plt.subplots(2, 1, figsize=(10, 8))
+
+    mask_fusion = df["gps_available"]
+    mask_imu = ~df["gps_available"]
+
+    axes[0].plot(df.loc[mask_fusion, "time_s"], df.loc[mask_fusion, "s2_err_2d"], label="GPS+IMU phase")
+    axes[0].plot(df.loc[mask_imu, "time_s"], df.loc[mask_imu, "s2_err_2d"], label="IMU-only phase")
+    axes[0].axvline(30.0, linestyle="--", color="black", label="GPS Outage")
+    axes[0].set_title("Position Error vs. GPS Reference — Full Window")
+    axes[0].set_ylabel("2D Horizontal Error (m)")
+    axes[0].grid(True)
+    axes[0].legend()
+
+    axes[1].plot(df.loc[mask_imu, "t_outage"], df.loc[mask_imu, "s2_err_x"], label="North")
+    axes[1].plot(df.loc[mask_imu, "t_outage"], df.loc[mask_imu, "s2_err_y"], label="East")
+    if "s2_err_z" in df.columns:
+        axes[1].plot(df.loc[mask_imu, "t_outage"], df.loc[mask_imu, "s2_err_z"], label="Down")
+    axes[1].set_title("NED Error Components after GPS Outage")
+    axes[1].set_xlabel("Time since GPS outage (s)")
+    axes[1].set_ylabel("Position Error (m)")
+    axes[1].grid(True)
+    axes[1].legend()
+
+    plt.tight_layout()
+
+    final_output_path = None
+    if save_figure:
+        final_output_path = (
+            Path(output_path)
+            if output_path is not None
+            else get_figures_dir() / "S2_drift_analysis.png"
+        )
+        plt.savefig(final_output_path, dpi=300, bbox_inches="tight")
+
+    _safe_show_or_close(show_plot)
+    return final_output_path
+
+
+def plot_scenario2_navigation_states(
+    scenario2_df: pd.DataFrame,
+    outage_start_s: float = 30.0,
+    save_figure: bool = True,
+    output_path: str | os.PathLike | None = None,
+    show_plot: bool = True,
+) -> Path | None:
+    required = ["time_s"]
+    missing = [col for col in required if col not in scenario2_df.columns]
+    if missing:
+        raise ValueError(f"Colonnes manquantes pour les états scénario 2 : {missing}")
+
+    df = scenario2_df.copy()
+    df = df.sort_values("time_s").reset_index(drop=True)
+
+    if "vx_imu" in df.columns and "vy_imu" in df.columns:
+        df["horizontal_speed"] = (df["vx_imu"] ** 2 + df["vy_imu"] ** 2) ** 0.5
+    else:
+        raise ValueError("Colonnes vx_imu et vy_imu requises pour la vitesse horizontale.")
+
+    if "yaw" in df.columns:
+        df["heading_plot"] = df["yaw"]
+    else:
+        if "x_s2" not in df.columns or "y_s2" not in df.columns:
+            raise ValueError(
+                "Colonnes manquantes pour les états scénario 2 : ['yaw'] et aucune trajectoire x_s2/y_s2 disponible pour approximer le cap."
+            )
+
+        dx = df["x_s2"].diff().fillna(0.0)
+        dy = df["y_s2"].diff().fillna(0.0)
+        df["heading_plot"] = np.degrees(np.arctan2(dy, dx))
+        df["heading_plot"] = (
+            df["heading_plot"]
+            .replace([np.inf, -np.inf], np.nan)
+            .ffill()
+            .bfill()
+            .fillna(0.0)
+        )
+
+    fig, axes = plt.subplots(2, 1, figsize=(10, 8))
+
+    axes[0].plot(df["time_s"], df["horizontal_speed"])
+    axes[0].axvline(outage_start_s, linestyle="--", color="black", label="GPS Outage")
+    axes[0].set_title("Horizontal Speed Estimate")
+    axes[0].set_ylabel("Horizontal Speed (m/s)")
+    axes[0].grid(True)
+    axes[0].legend()
+
+    axes[1].plot(df["time_s"], df["heading_plot"])
+    axes[1].axvline(outage_start_s, linestyle="--", color="black", label="GPS Outage")
+    axes[1].set_title("Heading (Yaw) Estimate")
+    axes[1].set_xlabel("Time (s)")
+    axes[1].set_ylabel("Yaw / Heading (deg)")
+    axes[1].grid(True)
+    axes[1].legend()
+
+    plt.tight_layout()
+
+    final_output_path = None
+    if save_figure:
+        final_output_path = (
+            Path(output_path)
+            if output_path is not None
+            else get_figures_dir() / "S2_navigation_states.png"
+        )
+        plt.savefig(final_output_path, dpi=300, bbox_inches="tight")
+
+    _safe_show_or_close(show_plot)
+    return final_output_path
