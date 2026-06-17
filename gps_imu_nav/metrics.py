@@ -41,7 +41,7 @@ def compute_rmse(series: pd.Series) -> float:
     """
     clean = pd.to_numeric(series, errors="coerce").dropna()
     if clean.empty:
-        raise ValueError("Impossible de calculer le RMSE sur une série vide.")
+        return float("nan")
     return float(np.sqrt(np.mean(clean**2)))
 
 
@@ -52,19 +52,34 @@ def summarize_error_statistics(
 ) -> pd.DataFrame:
     """
     Retourne un petit tableau de statistiques d'erreur.
+    Gère proprement le cas d'un DataFrame vide.
     """
     if err_2d_col not in df.columns:
         raise ValueError(f"Colonne absente : {err_2d_col}")
 
-    summary = {
-        "Erreur 2D moyenne": float(df[err_2d_col].mean()),
-        "Erreur 2D RMS": compute_rmse(df[err_2d_col]),
-        "Erreur 2D maximale": float(df[err_2d_col].max()),
-    }
+    clean_2d = pd.to_numeric(df[err_2d_col], errors="coerce").dropna()
+
+    if clean_2d.empty:
+        summary = {
+            "Erreur 2D moyenne": float("nan"),
+            "Erreur 2D RMS": float("nan"),
+            "Erreur 2D maximale": float("nan"),
+        }
+    else:
+        summary = {
+            "Erreur 2D moyenne": float(clean_2d.mean()),
+            "Erreur 2D RMS": compute_rmse(clean_2d),
+            "Erreur 2D maximale": float(clean_2d.max()),
+        }
 
     if err_3d_col is not None and err_3d_col in df.columns:
-        summary["Erreur 3D moyenne"] = float(df[err_3d_col].mean())
-        summary["Erreur 3D RMS"] = compute_rmse(df[err_3d_col])
+        clean_3d = pd.to_numeric(df[err_3d_col], errors="coerce").dropna()
+        if clean_3d.empty:
+            summary["Erreur 3D moyenne"] = float("nan")
+            summary["Erreur 3D RMS"] = float("nan")
+        else:
+            summary["Erreur 3D moyenne"] = float(clean_3d.mean())
+            summary["Erreur 3D RMS"] = compute_rmse(clean_3d)
 
     return pd.DataFrame(
         {

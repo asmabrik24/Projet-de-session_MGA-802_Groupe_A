@@ -52,6 +52,10 @@ def apply_time_window(df: pd.DataFrame, t_start: float, t_end: float | None) -> 
             f"La fenêtre temporelle choisie ne contient aucune donnée. Intervalle disponible : [{time_min:.3f}, {time_max:.3f}] s."
         )
 
+    # Rebase le temps pour que la fenêtre sélectionnée démarre à 0 s.
+    filtered = filtered.copy()
+    filtered["time_s"] = filtered["time_s"] - float(filtered["time_s"].iloc[0])
+
     return filtered
 
 
@@ -172,15 +176,20 @@ def main() -> None:
             prefix="s2_err",
         )
 
-        s2_stats = summarize_error_statistics(
-            scenario2_df[scenario2_df["gps_available"]],
-            err_2d_col="s2_err_2d",
-        )
+        scenario2_gps_phase = scenario2_df[scenario2_df["gps_available"]].copy()
 
         print("\n====================================")
         print("SCÉNARIO 2 — STATISTIQUES")
         print("====================================\n")
-        print(s2_stats)
+
+        if scenario2_gps_phase.empty:
+            print("[INFO] Aucune phase GPS disponible dans le scénario 2 avec la configuration actuelle.")
+        else:
+            s2_stats = summarize_error_statistics(
+                scenario2_gps_phase,
+                err_2d_col="s2_err_2d",
+            )
+            print(s2_stats)
 
         if config["show_plot"] and config["show_trajectory"]:
             plot_scenario2_trajectory(

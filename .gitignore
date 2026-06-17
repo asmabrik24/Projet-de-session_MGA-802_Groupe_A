@@ -226,3 +226,6 @@ __marimo__/
 # Données générées localement
 /données/*.csv
 /données/*.pkl
+
+# Figures générées localement
+*.png
