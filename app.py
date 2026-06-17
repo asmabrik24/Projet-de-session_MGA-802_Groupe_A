@@ -64,6 +64,52 @@ def build_scenario2(window_df: pd.DataFrame, outage_start_s: float) -> pd.DataFr
     return scenario2_df
 
 
+def build_xy_trajectory_df(
+    df: pd.DataFrame,
+    series: list[tuple[str, str, str]],
+) -> pd.DataFrame:
+    records = []
+    for x_col, y_col, label in series:
+        if x_col in df.columns and y_col in df.columns:
+            tmp = df[[x_col, y_col]].copy()
+            tmp.columns = ["x", "y"]
+            tmp["Trajectoire"] = label
+            records.append(tmp)
+
+    if not records:
+        return pd.DataFrame(columns=["x", "y", "Trajectoire"])
+
+    return pd.concat(records, ignore_index=True)
+
+
+
+def plot_trajectory_2d(df: pd.DataFrame, title: str, series: list[tuple[str, str, str]]):
+    st.subheader(title)
+    xy_df = build_xy_trajectory_df(df, series)
+
+    if xy_df.empty:
+        st.info("Aucune trajectoire 2D disponible pour cet affichage.")
+        return
+
+    st.scatter_chart(
+        xy_df,
+        x="x",
+        y="y",
+        color="Trajectoire",
+        use_container_width=True,
+    )
+
+
+
+def render_summary_metrics(window_df: pd.DataFrame, alpha: float, outage_start_s: float):
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Échantillons", len(window_df))
+    c2.metric("Début fenêtre", f"{window_df['time_s'].min():.1f} s")
+    c3.metric("Fin fenêtre", f"{window_df['time_s'].max():.1f} s")
+    c4.metric("Panne GPS", f"{outage_start_s:.1f} s")
+    st.caption(f"Coefficient alpha courant : {alpha:.2f}")
+
+
 def plot_trajectory_chart(df: pd.DataFrame, title: str, cols: list[tuple[str, str]]):
     chart_df = pd.DataFrame({"time_s": df["time_s"]})
     labels = []
@@ -73,7 +119,12 @@ def plot_trajectory_chart(df: pd.DataFrame, title: str, cols: list[tuple[str, st
             labels.append(label)
 
     st.subheader(title)
-    st.line_chart(chart_df.set_index("time_s")[labels])
+
+    if not labels:
+        st.info("Aucune donnée disponible pour ce graphique.")
+        return
+
+    st.line_chart(chart_df.set_index("time_s")[labels], use_container_width=True)
 
 
 def main():
@@ -158,46 +209,65 @@ def main():
         st.write("- IMU seule")
         st.write("- Fusion GPS / IMU")
         st.write("Il inclut aussi une simulation de panne GPS.")
+        st.success("Astuce : une fenêtre de 300 s donne souvent une démonstration plus lisible.")
 
         st.subheader("Résumé de la fenêtre courante")
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Nombre d'échantillons", len(window_df))
-        c2.metric("Début (s)", f"{window_df['time_s'].min():.1f}")
-        c3.metric("Fin (s)", f"{window_df['time_s'].max():.1f}")
+        render_summary_metrics(window_df, alpha=alpha, outage_start_s=outage_start_s)
 
     elif menu == "Chargement et prétraitement":
         st.subheader("Aperçu des données")
-        st.write(f"Shape : {window_df.shape}")
-        st.write("Colonnes disponibles :")
-        st.write(list(window_df.columns))
-        st.dataframe(window_df.head(20), use_container_width=True)
+        col1, col2 = st.columns([0.7, 0.3])
+        with col1:
+            st.dataframe(window_df.head(20), use_container_width=True)
+        with col2:
+            st.write(f"Shape : {window_df.shape}")
+            st.write("Colonnes disponibles :")
+            st.write(list(window_df.columns))
 
     elif menu == "Scénario 1 — Fusion GPS/IMU":
-        st.subheader("Trajectoires estimées")
-        st.dataframe(
-            window_df[
-                [c for c in ["time_s", "x_gps", "y_gps", "x_imu", "y_imu", "x_fused", "y_fused"] if c in window_df.columns]
-            ].head(30),
-            use_container_width=True,
-        )
+        tab1, tab2, tab3 = st.tabs([
+            "Trajectoire 2D",
+            "Séries temporelles",
+            "Tableau",
+        ])
 
-        plot_trajectory_chart(
-            window_df,
-            "Évolution de x en fonction du temps",
-            [("x_gps", "x_gps"), ("x_imu", "x_imu"), ("x_fused", "x_fused")],
-        )
+        with tab1:
+            plot_trajectory_2d(
+                window_df,
+                "Trajectoire 2D — GPS / IMU / Fusion",
+                [
+                    ("x_gps", "y_gps", "GPS"),
+                    ("x_imu", "y_imu", "IMU"),
+                    ("x_fused", "y_fused", "Fusion"),
+                ],
+            )
 
-        plot_trajectory_chart(
-            window_df,
-            "Évolution de y en fonction du temps",
-            [("y_gps", "y_gps"), ("y_imu", "y_imu"), ("y_fused", "y_fused")],
-        )
-
-        if {"vx_imu", "vy_imu"}.issubset(window_df.columns):
+        with tab2:
             plot_trajectory_chart(
                 window_df,
-                "Vitesses estimées",
-                [("vx_imu", "vx_imu"), ("vy_imu", "vy_imu"), ("vx_fused", "vx_fused"), ("vy_fused", "vy_fused")],
+                "Évolution de x en fonction du temps",
+                [("x_gps", "x_gps"), ("x_imu", "x_imu"), ("x_fused", "x_fused")],
+            )
+
+            plot_trajectory_chart(
+                window_df,
+                "Évolution de y en fonction du temps",
+                [("y_gps", "y_gps"), ("y_imu", "y_imu"), ("y_fused", "y_fused")],
+            )
+
+            if {"vx_imu", "vy_imu"}.issubset(window_df.columns):
+                plot_trajectory_chart(
+                    window_df,
+                    "Vitesses estimées",
+                    [("vx_imu", "vx_imu"), ("vy_imu", "vy_imu"), ("vx_fused", "vx_fused"), ("vy_fused", "vy_fused")],
+                )
+
+        with tab3:
+            st.dataframe(
+                window_df[
+                    [c for c in ["time_s", "x_gps", "y_gps", "x_imu", "y_imu", "x_fused", "y_fused"] if c in window_df.columns]
+                ].head(30),
+                use_container_width=True,
             )
 
     elif menu == "Scénario 2 — Panne GPS":
@@ -207,31 +277,52 @@ def main():
             st.error(f"Erreur scénario 2 : {exc}")
             return
 
-        st.subheader("Aperçu du scénario 2")
-        st.dataframe(
-            scenario2_df[
-                [c for c in ["time_s", "gps_available", "x_gps", "y_gps", "x_s2", "y_s2", "s2_err_2d"] if c in scenario2_df.columns]
-            ].head(30),
-            use_container_width=True,
-        )
+        tab1, tab2, tab3, tab4 = st.tabs([
+            "Trajectoire 2D",
+            "Trajectoires x/y",
+            "Erreur 2D",
+            "Tableau",
+        ])
 
-        plot_trajectory_chart(
-            scenario2_df,
-            "Trajectoire scénario 2 — axe x",
-            [("x_gps", "x_gps"), ("x_s2", "x_s2")],
-        )
+        with tab1:
+            plot_trajectory_2d(
+                scenario2_df,
+                "Trajectoire 2D — GPS de référence vs scénario 2",
+                [
+                    ("x_gps", "y_gps", "GPS"),
+                    ("x_s2", "y_s2", "Scénario 2"),
+                ],
+            )
 
-        plot_trajectory_chart(
-            scenario2_df,
-            "Trajectoire scénario 2 — axe y",
-            [("y_gps", "y_gps"), ("y_s2", "y_s2")],
-        )
-
-        if "s2_err_2d" in scenario2_df.columns:
+        with tab2:
             plot_trajectory_chart(
                 scenario2_df,
-                "Erreur 2D scénario 2",
-                [("s2_err_2d", "s2_err_2d")],
+                "Trajectoire scénario 2 — axe x",
+                [("x_gps", "x_gps"), ("x_s2", "x_s2")],
+            )
+
+            plot_trajectory_chart(
+                scenario2_df,
+                "Trajectoire scénario 2 — axe y",
+                [("y_gps", "y_gps"), ("y_s2", "y_s2")],
+            )
+
+        with tab3:
+            if "s2_err_2d" in scenario2_df.columns:
+                plot_trajectory_chart(
+                    scenario2_df,
+                    "Erreur 2D scénario 2",
+                    [("s2_err_2d", "s2_err_2d")],
+                )
+            else:
+                st.info("La colonne s2_err_2d n'est pas disponible pour cette configuration.")
+
+        with tab4:
+            st.dataframe(
+                scenario2_df[
+                    [c for c in ["time_s", "gps_available", "x_gps", "y_gps", "x_s2", "y_s2", "s2_err_2d"] if c in scenario2_df.columns]
+                ].head(30),
+                use_container_width=True,
             )
 
     elif menu == "Comparaison des résultats":
@@ -241,31 +332,36 @@ def main():
             st.error(f"Erreur calcul scénario 2 : {exc}")
             return
 
-        s2_phase_gps = scenario2_df[scenario2_df["gps_available"]]
+        col1, col2 = st.columns(2)
 
-        if not s2_phase_gps.empty and "s2_err_2d" in s2_phase_gps.columns:
-            stats_s2 = summarize_error_statistics(
-                s2_phase_gps,
-                err_2d_col="s2_err_2d",
-            )
-            st.subheader("Statistiques scénario 2")
-            st.dataframe(stats_s2, use_container_width=True)
+        with col1:
+            summary = pd.DataFrame({
+                "Mode": ["GPS", "IMU", "Fusion"],
+                "x_final": [
+                    window_df["x_gps"].iloc[-1] if "x_gps" in window_df.columns else None,
+                    window_df["x_imu"].iloc[-1] if "x_imu" in window_df.columns else None,
+                    window_df["x_fused"].iloc[-1] if "x_fused" in window_df.columns else None,
+                ],
+                "y_final": [
+                    window_df["y_gps"].iloc[-1] if "y_gps" in window_df.columns else None,
+                    window_df["y_imu"].iloc[-1] if "y_imu" in window_df.columns else None,
+                    window_df["y_fused"].iloc[-1] if "y_fused" in window_df.columns else None,
+                ],
+            })
+            st.subheader("Résumé final")
+            st.dataframe(summary, use_container_width=True)
 
-        summary = pd.DataFrame({
-            "Mode": ["GPS", "IMU", "Fusion"],
-            "x_final": [
-                window_df["x_gps"].iloc[-1] if "x_gps" in window_df.columns else None,
-                window_df["x_imu"].iloc[-1] if "x_imu" in window_df.columns else None,
-                window_df["x_fused"].iloc[-1] if "x_fused" in window_df.columns else None,
-            ],
-            "y_final": [
-                window_df["y_gps"].iloc[-1] if "y_gps" in window_df.columns else None,
-                window_df["y_imu"].iloc[-1] if "y_imu" in window_df.columns else None,
-                window_df["y_fused"].iloc[-1] if "y_fused" in window_df.columns else None,
-            ],
-        })
-        st.subheader("Résumé final")
-        st.dataframe(summary, use_container_width=True)
+        with col2:
+            s2_phase_gps = scenario2_df[scenario2_df["gps_available"]]
+            if not s2_phase_gps.empty and "s2_err_2d" in s2_phase_gps.columns:
+                stats_s2 = summarize_error_statistics(
+                    s2_phase_gps,
+                    err_2d_col="s2_err_2d",
+                )
+                st.subheader("Statistiques scénario 2")
+                st.dataframe(stats_s2, use_container_width=True)
+            else:
+                st.info("Aucune statistique scénario 2 disponible pour cette configuration.")
 
     elif menu == "Export":
         st.subheader("Export des données")
