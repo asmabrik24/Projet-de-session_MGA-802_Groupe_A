@@ -7,8 +7,6 @@ Gestion complète des saisies et des exceptions.
 
 from __future__ import annotations
 
-import os
-
 
 class UserInterface:
     """
@@ -16,7 +14,7 @@ class UserInterface:
     Permet de configurer l'analyse avant l'exécution.
     """
 
-    def get_user_config(self) -> dict:
+    def get_user_config(self, total_duration_s: float | None = None) -> dict:
         """
         Récupère et valide tous les paramètres utilisateur.
 
@@ -24,12 +22,21 @@ class UserInterface:
         -------
         dict
             Dictionnaire de configuration.
+
+        Parameters
+        ----------
+        total_duration_s : float | None
+            Durée maximale disponible de la trajectoire en secondes.
+            Si fournie, les saisies utilisateur sont validées par rapport
+            à cette borne.
         """
 
         print("\n====================================")
         print(" PARAMÈTRES UTILISATEUR")
         print("====================================")
 
+        if total_duration_s is not None:
+            print(f"[INFO] Durée disponible de la trajectoire : {total_duration_s:.3f} s")
 
         # --------------------------------------------------
         # Fenêtre temporelle
@@ -44,12 +51,19 @@ class UserInterface:
                 0.0
             )
 
-            if t_start >= 0:
-                break
+            if t_start < 0:
+                print(
+                    "[ERREUR] Le temps de début doit être positif."
+                )
+                continue
 
-            print(
-                "[ERREUR] Le temps de début doit être positif."
-            )
+            if total_duration_s is not None and t_start > total_duration_s:
+                print(
+                    f"[ERREUR] Le temps de début dépasse la durée disponible ({total_duration_s:.3f} s)."
+                )
+                continue
+
+            break
 
         while True:
 
@@ -62,18 +76,28 @@ class UserInterface:
                 t_end = None
                 break
 
-            if t_end > t_start:
-                break
+            if t_end <= t_start:
+                print(
+                    "[ERREUR] Le temps de fin doit être supérieur au temps de début."
+                )
+                continue
 
-            print(
-                "[ERREUR] Le temps de fin doit être supérieur au temps de début."
-            )
+            if total_duration_s is not None and t_end > total_duration_s:
+                print(
+                    f"[ERREUR] Le temps de fin dépasse la durée disponible ({total_duration_s:.3f} s)."
+                )
+                continue
+
+            break
 
         # --------------------------------------------------
-        # Panne GPS
+        # Simulation de panne GPS
         # --------------------------------------------------
 
         print("\n--- Simulation de panne GPS ---")
+
+        outage_start = 30.0
+        outage_duration = 10.0
 
         while True:
 
@@ -82,12 +106,25 @@ class UserInterface:
                 30.0
             )
 
-            if outage_start >= 0:
-                break
+            if outage_start < 0:
+                print(
+                    "[ERREUR] Le début de la panne GPS doit être positif."
+                )
+                continue
 
-            print(
-                "[ERREUR] La valeur doit être positive."
-            )
+            if total_duration_s is not None and outage_start > total_duration_s:
+                print(
+                    f"[ERREUR] Le début de la panne GPS dépasse la durée disponible ({total_duration_s:.3f} s)."
+                )
+                continue
+
+            if t_end is not None and outage_start > t_end:
+                print(
+                    "[ERREUR] Le début de la panne GPS doit être inclus dans la fenêtre d'analyse."
+                )
+                continue
+
+            break
 
         while True:
 
@@ -96,22 +133,27 @@ class UserInterface:
                 10.0
             )
 
-            if outage_duration >= 0:
-                break
-
-            print(
-                "[ERREUR] La durée doit être positive."
-            )
-
-        if t_end is not None:
+            if outage_duration < 0:
+                print(
+                    "[ERREUR] La durée de la panne GPS doit être positive."
+                )
+                continue
 
             outage_end = outage_start + outage_duration
 
-            if outage_end > t_end:
-
+            if total_duration_s is not None and outage_end > total_duration_s:
                 print(
-                    "[ATTENTION] La panne GPS dépasse la fenêtre d'analyse."
+                    f"[ERREUR] La panne GPS dépasse la durée disponible ({total_duration_s:.3f} s)."
                 )
+                continue
+
+            if t_end is not None and outage_end > t_end:
+                print(
+                    "[ERREUR] La panne GPS dépasse la fenêtre d'analyse choisie."
+                )
+                continue
+
+            break
 
         # --------------------------------------------------
         # Mode de navigation
@@ -138,6 +180,8 @@ class UserInterface:
 
         nav_mode = nav_modes[mode]
 
+        print(f"[INFO] Mode sélectionné : {nav_mode}")
+
         # --------------------------------------------------
         # Paramètre Alpha
         # --------------------------------------------------
@@ -145,6 +189,7 @@ class UserInterface:
         alpha = None
 
         if nav_mode == "FUSION":
+            # Alpha ne s'applique qu'au mode fusion.
 
             while True:
 
@@ -177,7 +222,7 @@ class UserInterface:
         if show_plot:
 
             show_trajectory = self._read_bool(
-                "Afficher la trajectoire",
+                "Afficher les trajectoires",
                 True
             )
 
@@ -185,6 +230,11 @@ class UserInterface:
                 "Afficher les vitesses",
                 True
             )
+
+        if nav_mode != "FUSION":
+            outage_start = 0.0
+            outage_duration = 0.0
+            print("[INFO] Les paramètres de panne GPS sont ignorés hors mode FUSION.")
 
         # --------------------------------------------------
         # Configuration finale
@@ -218,7 +268,8 @@ class UserInterface:
         print("====================================")
 
         for key, value in config.items():
-            print(f"{key:<20} : {value}")
+            label = key.replace("_", " ")
+            print(f"{label:<20} : {value}")
 
         print("====================================")
 

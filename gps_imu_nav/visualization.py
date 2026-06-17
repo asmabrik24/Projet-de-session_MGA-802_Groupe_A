@@ -260,24 +260,33 @@ def plot_velocities(
 
 def summarize_navigation_results(navigation_results: pd.DataFrame) -> pd.DataFrame:
     """
-    Retourne un petit tableau résumé des positions finales.
+    Retourne un tableau résumé des positions finales pour les modes réellement disponibles.
+    Compatible avec GPS_ONLY, IMU_ONLY et FUSION.
     """
-    validate_navigation_results(navigation_results)
+    available_modes = []
 
-    summary = pd.DataFrame({
-        "mode": ["GPS", "IMU", "Fusion"],
-        "x_final_m": [
-            float(navigation_results["x_gps"].iloc[-1]),
-            float(navigation_results["x_imu"].iloc[-1]),
-            float(navigation_results["x_fused"].iloc[-1]),
-        ],
-        "y_final_m": [
-            float(navigation_results["y_gps"].iloc[-1]),
-            float(navigation_results["y_imu"].iloc[-1]),
-            float(navigation_results["y_fused"].iloc[-1]),
-        ],
-    })
+    mode_specs = [
+        ("GPS", "x_gps", "y_gps"),
+        ("IMU", "x_imu", "y_imu"),
+        ("Fusion", "x_fused", "y_fused"),
+    ]
 
+    for mode_name, x_col, y_col in mode_specs:
+        if x_col in navigation_results.columns and y_col in navigation_results.columns:
+            available_modes.append(
+                {
+                    "mode": mode_name,
+                    "x_final_m": float(navigation_results[x_col].iloc[-1]),
+                    "y_final_m": float(navigation_results[y_col].iloc[-1]),
+                }
+            )
+
+    if not available_modes:
+        raise ValueError(
+            "Aucune trajectoire exploitable n'est disponible pour résumer les résultats de navigation."
+        )
+
+    summary = pd.DataFrame(available_modes)
     return summary
 
 def plot_scenario2_trajectory(
