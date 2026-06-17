@@ -11,7 +11,7 @@ from gps_imu_nav.visualization import (
 )
 from gps_imu_nav.scenario2 import simulate_gps_outage
 from gps_imu_nav.metrics import compute_position_errors, summarize_error_statistics
-
+from  gps_imu_nav.user_interface import UserInterface
 
 def main() -> None:
     """Point d'entree principal du projet MGA802."""
