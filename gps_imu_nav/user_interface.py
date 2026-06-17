@@ -30,32 +30,6 @@ class UserInterface:
         print(" PARAMÈTRES UTILISATEUR")
         print("====================================")
 
-        # --------------------------------------------------
-        # Fichier CSV
-        # --------------------------------------------------
-
-        print("\n--- Sélection du fichier ---")
-
-        while True:
-
-            file_path = self._read_string(
-                "Chemin du fichier CSV",
-                "data.csv"
-            )
-
-            if not os.path.exists(file_path):
-                print(
-                    f"[ERREUR] Le fichier '{file_path}' est introuvable."
-                )
-                continue
-
-            if not file_path.lower().endswith(".csv"):
-                print(
-                    "[ERREUR] Le fichier doit être au format CSV."
-                )
-                continue
-
-            break
 
         # --------------------------------------------------
         # Fenêtre temporelle
@@ -217,7 +191,7 @@ class UserInterface:
         # --------------------------------------------------
 
         config = {
-            "file_path": file_path,
+
             "t_start": t_start,
             "t_end": t_end,
             "outage_start": outage_start,
