@@ -1,4 +1,7 @@
-pandas
-numpy
+Pandas
+NumPy
+Matplotlib
+PyTest
+Sphinx
+Streamlit
 openpyxl
-pytest
