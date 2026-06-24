@@ -26,11 +26,9 @@ Le projet permet également :
 Projet-de-session_MGA-802_Groupe_A/
 │
 ├── données/
-│   └── Fichiers GPS et IMU
 │
 ├── figures/
-│   └── Graphiques générés
-│
+│   
 ├── gps_imu_nav/
 │   ├── chargeur_donnees.py
 │   ├── pipeline.py
