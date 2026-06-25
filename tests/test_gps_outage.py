@@ -14,93 +14,101 @@ from gps_imu_nav.gps_outage import GPSOutageSimulator
 
 
 def test_gps_outage_replaces_gps_values_with_nan():
-     """
-    Vérifie que les valeurs GPS sont remplacées par NaN
-    durant la période de panne simulée.
     """
-    data = pd.DataFrame({
-        "time_s": [0, 1, 2, 3, 4, 5],
-        "x_gps": [10, 11, 12, 13, 14, 15],
-        "y_gps": [20, 21, 22, 23, 24, 25],
-        "x_imu": [100, 101, 102, 103, 104, 105],
-        "y_imu": [200, 201, 202, 203, 204, 205],
-    })
+   Vérifie que les valeurs GPS sont remplacées par NaN
+   durant la période de panne simulée.
+   """
 
-    simulator = GPSOutageSimulator(data)
 
-    result = simulator.simulate_outage(
-        start_time=2,
-        duration=2
-    )
+data = pd.DataFrame({
+    "time_s": [0, 1, 2, 3, 4, 5],
+    "x_gps": [10, 11, 12, 13, 14, 15],
+    "y_gps": [20, 21, 22, 23, 24, 25],
+    "x_imu": [100, 101, 102, 103, 104, 105],
+    "y_imu": [200, 201, 202, 203, 204, 205],
+})
 
-    outage_rows = result["time_s"].between(2, 4)
+simulator = GPSOutageSimulator(data)
 
-    assert result.loc[outage_rows, "x_gps"].isna().all()
-    assert result.loc[outage_rows, "y_gps"].isna().all()
+result = simulator.simulate_outage(
+    start_time=2,
+    duration=2
+)
+
+outage_rows = result["time_s"].between(2, 4)
+
+assert result.loc[outage_rows, "x_gps"].isna().all()
+assert result.loc[outage_rows, "y_gps"].isna().all()
 
 
 def test_gps_outage_keeps_values_outside_outage():
-       """
-    Vérifie que les données GPS situées en dehors
-    de la période de panne restent inchangées.
     """
-    data = pd.DataFrame({
-        "time_s": [0, 1, 2, 3, 4, 5],
-        "x_gps": [10, 11, 12, 13, 14, 15],
-        "y_gps": [20, 21, 22, 23, 24, 25],
-    })
+ Vérifie que les données GPS situées en dehors
+ de la période de panne restent inchangées.
+ """
 
-    simulator = GPSOutageSimulator(data)
 
-    result = simulator.simulate_outage(
-        start_time=2,
-        duration=2
-    )
+data = pd.DataFrame({
+    "time_s": [0, 1, 2, 3, 4, 5],
+    "x_gps": [10, 11, 12, 13, 14, 15],
+    "y_gps": [20, 21, 22, 23, 24, 25],
+})
 
-    outside_rows = ~result["time_s"].between(2, 4)
+simulator = GPSOutageSimulator(data)
 
-    assert result.loc[outside_rows, "x_gps"].notna().all()
-    assert result.loc[outside_rows, "y_gps"].notna().all()
+result = simulator.simulate_outage(
+    start_time=2,
+    duration=2
+)
+
+outside_rows = ~result["time_s"].between(2, 4)
+
+assert result.loc[outside_rows, "x_gps"].notna().all()
+assert result.loc[outside_rows, "y_gps"].notna().all()
 
 
 def test_gps_outage_does_not_modify_imu_columns():
-        """
-    Vérifie que la simulation de panne GPS
-    n'affecte pas les données provenant de l'IMU.
     """
-    data = pd.DataFrame({
-        "time_s": [0, 1, 2, 3, 4, 5],
-        "x_gps": [10, 11, 12, 13, 14, 15],
-        "y_gps": [20, 21, 22, 23, 24, 25],
-        "x_imu": [100, 101, 102, 103, 104, 105],
-        "y_imu": [200, 201, 202, 203, 204, 205],
-    })
+Vérifie que la simulation de panne GPS
+n'affecte pas les données provenant de l'IMU.
+"""
 
-    simulator = GPSOutageSimulator(data)
 
-    result = simulator.simulate_outage(
-        start_time=2,
-        duration=2
-    )
+data = pd.DataFrame({
+    "time_s": [0, 1, 2, 3, 4, 5],
+    "x_gps": [10, 11, 12, 13, 14, 15],
+    "y_gps": [20, 21, 22, 23, 24, 25],
+    "x_imu": [100, 101, 102, 103, 104, 105],
+    "y_imu": [200, 201, 202, 203, 204, 205],
+})
 
-    assert result["x_imu"].equals(data["x_imu"])
-    assert result["y_imu"].equals(data["y_imu"])
+simulator = GPSOutageSimulator(data)
+
+result = simulator.simulate_outage(
+    start_time=2,
+    duration=2
+)
+
+assert result["x_imu"].equals(data["x_imu"])
+assert result["y_imu"].equals(data["y_imu"])
 
 
 def test_gps_outage_raises_error_without_time_column():
-     """
-    Vérifie qu'une exception ValueError est levée
-    lorsque la colonne temporelle 'time_s' est absente.
     """
-    data = pd.DataFrame({
-        "x_gps": [10, 11, 12],
-        "y_gps": [20, 21, 22],
-    })
+   Vérifie qu'une exception ValueError est levée
+   lorsque la colonne temporelle 'time_s' est absente.
+   """
 
-    simulator = GPSOutageSimulator(data)
 
-    with pytest.raises(ValueError):
-        simulator.simulate_outage(
-            start_time=1,
-            duration=1
-        )
+data = pd.DataFrame({
+    "x_gps": [10, 11, 12],
+    "y_gps": [20, 21, 22],
+})
+
+simulator = GPSOutageSimulator(data)
+
+with pytest.raises(ValueError):
+    simulator.simulate_outage(
+        start_time=1,
+        duration=1
+    )
