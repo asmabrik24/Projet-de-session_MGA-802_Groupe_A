@@ -22,13 +22,16 @@ Le projet permet également :
 # Structure du projet
 
 ```text
-
 Projet-de-session_MGA-802_Groupe_A/
 │
 ├── données/
 │
+├── docs/
+│   ├── source/
+│   └── build/
+│
 ├── figures/
-│   
+│
 ├── gps_imu_nav/
 │   ├── chargeur_donnees.py
 │   ├── pipeline.py
@@ -36,7 +39,6 @@ Projet-de-session_MGA-802_Groupe_A/
 │   ├── navigation.py
 │   ├── gps_outage.py
 │   ├── evaluator.py
-│   ├── graphique.py
 │   ├── user_interface.py
 │   └── visualization.py
 │
@@ -54,17 +56,25 @@ Projet-de-session_MGA-802_Groupe_A/
 ├── requirements.txt
 └── .gitignore
 ```
-| Module              | Rôle                                                     |
-| ------------------- | -------------------------------------------------------- |
-| Main.py             | Point d'entrée du programme                              |
-| User_interface.py   | Gestion des paramètres utilisateur                       |
-| Pipeline.py         | Exécution du pipeline complet                            |
-| Chargeur_donnees.py | Chargement et validation des données                     |
-| Pre_traitement.py   | Nettoyage et synchronisation                             |
-| Navigation.py       | Calcul des trajectoires GPS, IMU et Fusion               |
-| GPS_outage.py       | Simulation de panne GPS                                  |
-| Evaluator.py        | Calcul des erreurs et du RMSE                            |
-| Visualization.py    | Génération des graphiques et visualisation des résultats |
+
+---
+
+## Description des modules
+
+| Module | Rôle |
+|---------|------|
+| **main.py** | Point d'entrée du programme. |
+| **app.py** | Interface graphique développée avec Streamlit. |
+| **user_interface.py** | Gestion des paramètres utilisateur. |
+| **pipeline.py** | Exécution du pipeline complet de traitement des données. |
+| **chargeur_donnees.py** | Chargement et validation des données GPS et IMU. |
+| **pre_traitement.py** | Nettoyage, filtrage et synchronisation des données. |
+| **navigation.py** | Calcul des trajectoires GPS, IMU et Fusion GPS/IMU. |
+| **gps_outage.py** | Simulation d'une panne GPS pendant une période donnée. |
+| **evaluator.py** | Calcul des erreurs de position et du RMSE. |
+| **visualization.py** | Génération des graphiques de validation et visualisation des résultats. |
+| **tests/** | Tests unitaires des principaux modules du projet. |
+| **docs/** | Documentation HTML générée automatiquement avec Sphinx. |
 
 ---
 # Architecture orientée objet
@@ -250,18 +260,24 @@ Les résultats montrent que :
 
 # Documentation Sphinx
 
-La documentation HTML est générée automatiquement à partir des docstrings présentes dans le code.
+## Documentation Sphinx
 
-Génération :
+La documentation du projet est générée automatiquement à partir des docstrings présentes dans les modules Python à l'aide de **Sphinx**.
+
+### Génération de la documentation
+
+Depuis la racine du projet :
 
 ```bash
-sphinx-build -b html docs docs/_build/html
+docs\make.bat html
 ```
 
-Le résultat est disponible dans :
+### Consulter la documentation
+
+La documentation HTML générée est disponible dans :
 
 ```text
-docs/_build/html/index.html
+docs/build/html/index.html
 ```
 
 ---
