@@ -1,3 +1,22 @@
+"""
+main.py
+
+Point d'entrée principal du projet de fusion GPS/IMU.
+
+Ce script orchestre l'ensemble des étapes du programme :
+- exécution du pipeline de traitement des données ;
+- récupération des paramètres utilisateur ;
+- calcul des trajectoires GPS, IMU et Fusion ;
+- application d'une fenêtre temporelle d'analyse ;
+- simulation d'une panne GPS ;
+- calcul des erreurs de position ;
+- génération des graphiques et affichage des résultats.
+
+Projet réalisé dans le cadre du cours MGA802.
+"""
+
+import pandas as pd
+
 from gps_imu_nav.pipeline import FusionPipeline
 from gps_imu_nav.navigation import run_navigation
 from gps_imu_nav.visualization import plot_gps_trajectory_only
@@ -13,13 +32,29 @@ from gps_imu_nav.scenario2 import simulate_gps_outage
 from gps_imu_nav.metrics import compute_position_errors, summarize_error_statistics
 from gps_imu_nav.user_interface import UserInterface
 
-import pandas as pd
 
+def apply_time_window(
+    df: pd.DataFrame,
+    t_start: float,
+    t_end: float | None
+) -> pd.DataFrame:
+    """
+    Filtre les résultats de navigation selon une fenêtre temporelle.
 
-def apply_time_window(df: pd.DataFrame, t_start: float, t_end: float | None) -> pd.DataFrame:
-    """Filtre les résultats de navigation selon la fenêtre temporelle demandée."""
+    :param df: Résultats de navigation.
+    :type df: pandas.DataFrame
+    :param t_start: Temps de début de la fenêtre en secondes.
+    :type t_start: float
+    :param t_end: Temps de fin de la fenêtre en secondes. Si None, la fin du fichier est utilisée.
+    :type t_end: float | None
+    :return: Résultats filtrés avec un temps recalé à 0 seconde.
+    :rtype: pandas.DataFrame
+    :raises ValueError: Si les données sont vides ou si la fenêtre choisie ne contient aucune donnée.
+    """
     if df.empty:
-        raise ValueError("Les résultats de navigation sont vides avant l'application de la fenêtre temporelle.")
+        raise ValueError(
+            "Les résultats de navigation sont vides avant l'application de la fenêtre temporelle."
+        )
 
     if "time_s" not in df.columns:
         return df.copy()
@@ -49,18 +84,31 @@ def apply_time_window(df: pd.DataFrame, t_start: float, t_end: float | None) -> 
 
     if filtered.empty:
         raise ValueError(
-            f"La fenêtre temporelle choisie ne contient aucune donnée. Intervalle disponible : [{time_min:.3f}, {time_max:.3f}] s."
+            f"La fenêtre temporelle choisie ne contient aucune donnée. "
+            f"Intervalle disponible : [{time_min:.3f}, {time_max:.3f}] s."
         )
 
-    # Rebase le temps pour que la fenêtre sélectionnée démarre à 0 s.
+    # Recale le temps afin que la fenêtre sélectionnée démarre à 0 s.
     filtered = filtered.copy()
     filtered["time_s"] = filtered["time_s"] - float(filtered["time_s"].iloc[0])
 
     return filtered
 
 
-def apply_navigation_mode(df: pd.DataFrame, nav_mode: str) -> pd.DataFrame:
-    """Conserve uniquement les colonnes pertinentes selon le mode choisi."""
+def apply_navigation_mode(
+    df: pd.DataFrame,
+    nav_mode: str
+) -> pd.DataFrame:
+    """
+    Conserve uniquement les colonnes pertinentes selon le mode de navigation choisi.
+
+    :param df: Résultats de navigation.
+    :type df: pandas.DataFrame
+    :param nav_mode: Mode de navigation choisi par l'utilisateur.
+    :type nav_mode: str
+    :return: Résultats contenant seulement les colonnes utiles au mode choisi.
+    :rtype: pandas.DataFrame
+    """
     out = df.copy()
 
     if nav_mode == "GPS_ONLY":
@@ -77,96 +125,183 @@ def apply_navigation_mode(df: pd.DataFrame, nav_mode: str) -> pd.DataFrame:
         cols_to_drop = []
 
     cols_to_drop = [col for col in cols_to_drop if col in out.columns]
+
     if cols_to_drop:
         out = out.drop(columns=cols_to_drop)
 
     return out
 
+
 def main() -> None:
-    """Point d'entree principal du projet MGA802."""
+    """
+    Fonction principale du projet.
+
+    Elle coordonne les différentes étapes de l'exécution :
+    initialisation du pipeline, lecture des paramètres utilisateur,
+    navigation, simulation de panne GPS, évaluation des performances
+    et visualisation des résultats.
+    """
+    # =====================================================
+    # 1. Exécution du pipeline principal
+    # =====================================================
     pipeline = FusionPipeline()
     pipeline.run()
 
+    # =====================================================
+    # 2. Prévisualisation pour déterminer la durée disponible
+    # =====================================================
     preview_results = run_navigation(alpha=0.7, save_output=False)
+
     if preview_results.empty:
-        raise ValueError("Aucun résultat de navigation n'a été généré pour la prévisualisation.")
+        raise ValueError(
+            "Aucun résultat de navigation n'a été généré pour la prévisualisation."
+        )
 
     total_duration_s = None
+
     if "time_s" in preview_results.columns:
         preview_results = preview_results.copy()
-        preview_results["time_s"] = pd.to_numeric(preview_results["time_s"], errors="coerce")
+        preview_results["time_s"] = pd.to_numeric(
+            preview_results["time_s"],
+            errors="coerce"
+        )
         preview_results = preview_results.dropna(subset=["time_s"])
+
         if not preview_results.empty:
             total_duration_s = float(preview_results["time_s"].max())
 
+    # =====================================================
+    # 3. Lecture et validation des paramètres utilisateur
+    # =====================================================
     ui = UserInterface()
     config = ui.get_user_config(total_duration_s=total_duration_s)
 
+    # =====================================================
+    # 4. Exécution de la navigation selon les paramètres
+    # =====================================================
     alpha_value = config["alpha"] if config["alpha"] is not None else 0.7
-    navigation_results = run_navigation(alpha=alpha_value, save_output=True)
+
+    navigation_results = run_navigation(
+        alpha=alpha_value,
+        save_output=True
+    )
+
     if navigation_results.empty:
         raise ValueError("Aucun résultat de navigation n'a été généré.")
+
+    # =====================================================
+    # 5. Application de la fenêtre temporelle choisie
+    # =====================================================
     navigation_results = apply_time_window(
         navigation_results,
         t_start=config["t_start"],
         t_end=config["t_end"],
     )
+
+    # =====================================================
+    # 6. Application du mode de navigation choisi
+    # =====================================================
     navigation_results = apply_navigation_mode(
         navigation_results,
         nav_mode=config["nav_mode"],
     )
 
-    if config["show_plot"] and config["show_trajectory"] and {"x_gps", "y_gps"}.issubset(navigation_results.columns):
+    # =====================================================
+    # 7. Affichage de la trajectoire GPS seule
+    # =====================================================
+    if (
+        config["show_plot"]
+        and config["show_trajectory"]
+        and {"x_gps", "y_gps"}.issubset(navigation_results.columns)
+    ):
         plot_gps_trajectory_only(
             navigation_results,
             save_figure=True,
             show_plot=True,
         )
 
+    # =====================================================
+    # 8. Affichage des premières lignes des résultats
+    # =====================================================
     print("\n====================================")
     print("TRAJECTOIRES ESTIMÉES")
     print("====================================\n")
     print(navigation_results.head(10))
 
+    # =====================================================
+    # 9. Affichage des trajectoires comparatives
+    # =====================================================
     if config["show_plot"] and config["show_trajectory"]:
         if config["nav_mode"] == "FUSION":
             required_traj_cols = {
-                "x_gps", "y_gps", "x_imu", "y_imu", "x_fused", "y_fused"
+                "x_gps", "y_gps",
+                "x_imu", "y_imu",
+                "x_fused", "y_fused",
             }
+
             if required_traj_cols.issubset(set(navigation_results.columns)):
                 plot_trajectories(
                     navigation_results,
                     save_figure=True,
                     show_plot=True,
                 )
+
         elif config["nav_mode"] == "GPS_ONLY":
             print("[INFO] Le tracé comparatif complet est ignoré en mode GPS_ONLY.")
+
         elif config["nav_mode"] == "IMU_ONLY":
             print("[INFO] Le tracé comparatif complet est ignoré en mode IMU_ONLY.")
 
+    # =====================================================
+    # 10. Affichage des vitesses estimées
+    # =====================================================
     if config["show_plot"] and config["show_velocities"]:
-        required_vel_cols = {"vx_imu", "vy_imu", "vx_fused", "vy_fused"}
-        if config["nav_mode"] == "FUSION" and required_vel_cols.issubset(set(navigation_results.columns)):
+        required_vel_cols = {
+            "vx_imu", "vy_imu",
+            "vx_fused", "vy_fused",
+        }
+
+        if (
+            config["nav_mode"] == "FUSION"
+            and required_vel_cols.issubset(set(navigation_results.columns))
+        ):
             plot_velocities(
                 navigation_results,
                 save_figure=True,
                 show_plot=True,
             )
         else:
-            print("[INFO] Le tracé des vitesses comparées est disponible uniquement en mode FUSION.")
+            print(
+                "[INFO] Le tracé des vitesses comparées est disponible uniquement en mode FUSION."
+            )
 
-    if {"x_gps", "y_gps", "x_imu", "y_imu", "x_fused", "y_fused"}.intersection(set(navigation_results.columns)):
+    # =====================================================
+    # 11. Résumé des résultats de navigation
+    # =====================================================
+    if {
+        "x_gps", "y_gps",
+        "x_imu", "y_imu",
+        "x_fused", "y_fused",
+    }.intersection(set(navigation_results.columns)):
         summary = summarize_navigation_results(navigation_results)
+
         print("\n====================================")
         print("RÉSUMÉ NAVIGATION")
         print("====================================\n")
         print(summary)
 
+    # =====================================================
+    # 12. Simulation du scénario de panne GPS
+    # =====================================================
     if config["nav_mode"] == "FUSION":
         scenario2_df = simulate_gps_outage(
             navigation_results,
             outage_start_s=config["outage_start"],
         )
+
+        # =================================================
+        # 13. Calcul des erreurs de position du scénario 2
+        # =================================================
         scenario2_df = compute_position_errors(
             scenario2_df,
             x_est_col="x_s2",
@@ -176,14 +311,19 @@ def main() -> None:
             prefix="s2_err",
         )
 
-        scenario2_gps_phase = scenario2_df[scenario2_df["gps_available"]].copy()
+        scenario2_gps_phase = scenario2_df[
+            scenario2_df["gps_available"]
+        ].copy()
 
         print("\n====================================")
         print("SCÉNARIO 2 — STATISTIQUES")
         print("====================================\n")
 
         if scenario2_gps_phase.empty:
-            print("[INFO] Aucune phase GPS disponible dans le scénario 2 avec la configuration actuelle.")
+            print(
+                "[INFO] Aucune phase GPS disponible dans le scénario 2 "
+                "avec la configuration actuelle."
+            )
         else:
             s2_stats = summarize_error_statistics(
                 scenario2_gps_phase,
@@ -191,6 +331,9 @@ def main() -> None:
             )
             print(s2_stats)
 
+        # =================================================
+        # 14. Génération des graphiques du scénario 2
+        # =================================================
         if config["show_plot"] and config["show_trajectory"]:
             plot_scenario2_trajectory(
                 scenario2_df,
@@ -198,19 +341,25 @@ def main() -> None:
                 save_figure=True,
                 show_plot=True,
             )
+
             plot_scenario2_drift(
                 scenario2_df,
                 save_figure=True,
                 show_plot=True,
             )
+
             plot_scenario2_navigation_states(
                 scenario2_df,
                 outage_start_s=config["outage_start"],
                 save_figure=True,
                 show_plot=True,
             )
+
     else:
-        print("\n[INFO] Le scénario de panne GPS est ignoré car il nécessite le mode FUSION.")
+        print(
+            "\n[INFO] Le scénario de panne GPS est ignoré "
+            "car il nécessite le mode FUSION."
+        )
 
 
 if __name__ == "__main__":
