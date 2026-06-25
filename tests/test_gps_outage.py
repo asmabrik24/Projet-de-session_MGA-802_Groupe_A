@@ -1,3 +1,11 @@
+"""
+Tests unitaires du module gps_outage.
+
+Ce fichier vérifie le bon fonctionnement de la classe
+GPSOutageSimulator utilisée pour simuler une perte temporaire
+du signal GPS dans le cadre du projet de fusion GPS/IMU.
+"""
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -6,6 +14,10 @@ from gps_imu_nav.gps_outage import GPSOutageSimulator
 
 
 def test_gps_outage_replaces_gps_values_with_nan():
+     """
+    Vérifie que les valeurs GPS sont remplacées par NaN
+    durant la période de panne simulée.
+    """
     data = pd.DataFrame({
         "time_s": [0, 1, 2, 3, 4, 5],
         "x_gps": [10, 11, 12, 13, 14, 15],
@@ -28,6 +40,10 @@ def test_gps_outage_replaces_gps_values_with_nan():
 
 
 def test_gps_outage_keeps_values_outside_outage():
+       """
+    Vérifie que les données GPS situées en dehors
+    de la période de panne restent inchangées.
+    """
     data = pd.DataFrame({
         "time_s": [0, 1, 2, 3, 4, 5],
         "x_gps": [10, 11, 12, 13, 14, 15],
@@ -48,6 +64,10 @@ def test_gps_outage_keeps_values_outside_outage():
 
 
 def test_gps_outage_does_not_modify_imu_columns():
+        """
+    Vérifie que la simulation de panne GPS
+    n'affecte pas les données provenant de l'IMU.
+    """
     data = pd.DataFrame({
         "time_s": [0, 1, 2, 3, 4, 5],
         "x_gps": [10, 11, 12, 13, 14, 15],
@@ -68,6 +88,10 @@ def test_gps_outage_does_not_modify_imu_columns():
 
 
 def test_gps_outage_raises_error_without_time_column():
+     """
+    Vérifie qu'une exception ValueError est levée
+    lorsque la colonne temporelle 'time_s' est absente.
+    """
     data = pd.DataFrame({
         "x_gps": [10, 11, 12],
         "y_gps": [20, 21, 22],
