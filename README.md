@@ -301,7 +301,7 @@ docs/build/html/index.html
 - Documentation officielle de **Matplotlib** : https://matplotlib.org/stable/
 - Documentation officielle de **PyTest** : https://docs.pytest.org/
 - Documentation officielle de **Sphinx** : https://www.sphinx-doc.org/
-- 
+
 ---
 # Auteurs
 
