@@ -291,6 +291,18 @@ docs/build/html/index.html
 
 ---
 
+---
+
+# Références
+
+- Projet **GPS/IMU Sensor Fusion for Vehicle Navigation**, réalisé dans le cadre du cours **MGA852**, École de technologie supérieure (ÉTS), Montréal, Canada.
+- Documentation officielle de **NumPy** : https://numpy.org/doc/
+- Documentation officielle de **Pandas** : https://pandas.pydata.org/docs/
+- Documentation officielle de **Matplotlib** : https://matplotlib.org/stable/
+- Documentation officielle de **PyTest** : https://docs.pytest.org/
+- Documentation officielle de **Sphinx** : https://www.sphinx-doc.org/
+- 
+---
 # Auteurs
 
 - Asma BRIK
