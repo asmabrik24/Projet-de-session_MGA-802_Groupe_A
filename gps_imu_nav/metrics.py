@@ -1,7 +1,11 @@
 import numpy as np
 import pandas as pd
 
+# Module de calcul des métriques d'erreur.
+# Il fournit les fonctions utiles pour comparer une trajectoire estimée
+# à une référence GPS et produire des statistiques synthétiques.
 
+# Calcule les erreurs de position élémentaires et les normes 2D/3D associées.
 def compute_position_errors(
     df: pd.DataFrame,
     x_est_col: str,
@@ -15,17 +19,21 @@ def compute_position_errors(
     """
     Calcule les erreurs de position entre une estimation et la référence GPS.
     """
+    # Vérifie que les colonnes minimales nécessaires au calcul 2D sont présentes.
     required = [x_est_col, y_est_col, x_ref_col, y_ref_col]
     missing = [col for col in required if col not in df.columns]
     if missing:
         raise ValueError(f"Colonnes manquantes pour le calcul d'erreur : {missing}")
 
+    # Copie défensive pour préserver le DataFrame d'origine.
     out = df.copy()
 
+    # Calcul des écarts élémentaires et de la norme d'erreur plane.
     out[f"{prefix}_x"] = out[x_est_col] - out[x_ref_col]
     out[f"{prefix}_y"] = out[y_est_col] - out[y_ref_col]
     out[f"{prefix}_2d"] = np.sqrt(out[f"{prefix}_x"] ** 2 + out[f"{prefix}_y"] ** 2)
 
+    # Si les composantes verticales existent, calcule aussi l'erreur 3D.
     if z_est_col is not None and z_est_col in out.columns and z_ref_col in out.columns:
         out[f"{prefix}_z"] = out[z_est_col] - out[z_ref_col]
         out[f"{prefix}_3d"] = np.sqrt(
@@ -35,6 +43,7 @@ def compute_position_errors(
     return out
 
 
+# Calcule la racine de l'erreur quadratique moyenne à partir d'une série numérique.
 def compute_rmse(series: pd.Series) -> float:
     """
     Calcule le RMSE d'une série d'erreurs.
@@ -45,6 +54,7 @@ def compute_rmse(series: pd.Series) -> float:
     return float(np.sqrt(np.mean(clean**2)))
 
 
+# Construit un tableau récapitulatif des erreurs moyennes, RMS et maximales.
 def summarize_error_statistics(
     df: pd.DataFrame,
     err_2d_col: str,
@@ -54,11 +64,14 @@ def summarize_error_statistics(
     Retourne un petit tableau de statistiques d'erreur.
     Gère proprement le cas d'un DataFrame vide.
     """
+    # La colonne d'erreur 2D est obligatoire pour construire le résumé.
     if err_2d_col not in df.columns:
         raise ValueError(f"Colonne absente : {err_2d_col}")
 
+    # Nettoyage numérique pour ignorer les valeurs manquantes ou invalides.
     clean_2d = pd.to_numeric(df[err_2d_col], errors="coerce").dropna()
 
+    # Si aucune donnée exploitable n'est disponible, retourne des NaN plutôt qu'une erreur.
     if clean_2d.empty:
         summary = {
             "Erreur 2D moyenne": float("nan"),
@@ -72,6 +85,7 @@ def summarize_error_statistics(
             "Erreur 2D maximale": float(clean_2d.max()),
         }
 
+    # Ajoute les statistiques 3D uniquement si la colonne correspondante est disponible.
     if err_3d_col is not None and err_3d_col in df.columns:
         clean_3d = pd.to_numeric(df[err_3d_col], errors="coerce").dropna()
         if clean_3d.empty:

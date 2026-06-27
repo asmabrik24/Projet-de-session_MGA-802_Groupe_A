@@ -3,14 +3,14 @@ main.py
 
 Point d'entrée principal du projet de fusion GPS/IMU.
 
-Ce script orchestre l'ensemble des étapes du programme :
-- exécution du pipeline de traitement des données ;
-- récupération des paramètres utilisateur ;
-- calcul des trajectoires GPS, IMU et Fusion ;
-- application d'une fenêtre temporelle d'analyse ;
-- simulation d'une panne GPS ;
-- calcul des erreurs de position ;
-- génération des graphiques et affichage des résultats.
+Ce script orchestre :
+- l'exécution du pipeline de traitement des données ;
+- la lecture et la validation des paramètres utilisateur ;
+- le calcul des trajectoires GPS, IMU et fusionnées ;
+- l'application d'une fenêtre temporelle d'analyse ;
+- la simulation d'une panne GPS ;
+- le calcul des erreurs de position ;
+- la génération des graphiques et l'affichage des résultats.
 
 Projet réalisé dans le cadre du cours MGA802.
 """
@@ -31,6 +31,10 @@ from gps_imu_nav.visualization import (
 from gps_imu_nav.scenario2 import simulate_gps_outage
 from gps_imu_nav.metrics import compute_position_errors, summarize_error_statistics
 from gps_imu_nav.user_interface import UserInterface
+
+
+TRAJ_COLS = {"x_gps", "y_gps", "x_imu", "y_imu", "x_fused", "y_fused"}
+VEL_COLS = {"vx_imu", "vy_imu", "vx_fused", "vy_fused"}
 
 
 def apply_time_window(
@@ -111,18 +115,19 @@ def apply_navigation_mode(
     """
     out = df.copy()
 
-    if nav_mode == "GPS_ONLY":
-        cols_to_drop = [
+    cols_to_drop_by_mode = {
+        "GPS_ONLY": [
             "x_imu", "y_imu", "vx_imu", "vy_imu",
             "x_fused", "y_fused", "vx_fused", "vy_fused",
-        ]
-    elif nav_mode == "IMU_ONLY":
-        cols_to_drop = [
+        ],
+        "IMU_ONLY": [
             "x_gps", "y_gps", "z_gps", "vx_gps", "vy_gps",
             "x_fused", "y_fused", "vx_fused", "vy_fused",
-        ]
-    else:
-        cols_to_drop = []
+        ],
+        "FUSION": [],
+    }
+
+    cols_to_drop = cols_to_drop_by_mode.get(nav_mode, [])
 
     cols_to_drop = [col for col in cols_to_drop if col in out.columns]
 
@@ -130,6 +135,18 @@ def apply_navigation_mode(
         out = out.drop(columns=cols_to_drop)
 
     return out
+
+
+def _print_section(title: str) -> None:
+    """Affiche un titre de section homogène dans le terminal."""
+    print("\n====================================")
+    print(title)
+    print("====================================\n")
+
+
+def _has_any_columns(df: pd.DataFrame, columns: set[str]) -> bool:
+    """Vérifie si au moins une colonne de l'ensemble est présente."""
+    return any(col in df.columns for col in columns)
 
 
 def main() -> None:
@@ -223,9 +240,7 @@ def main() -> None:
     # =====================================================
     # 8. Affichage des premières lignes des résultats
     # =====================================================
-    print("\n====================================")
-    print("TRAJECTOIRES ESTIMÉES")
-    print("====================================\n")
+    _print_section("TRAJECTOIRES ESTIMÉES")
     print(navigation_results.head(10))
 
     # =====================================================
@@ -233,38 +248,22 @@ def main() -> None:
     # =====================================================
     if config["show_plot"] and config["show_trajectory"]:
         if config["nav_mode"] == "FUSION":
-            required_traj_cols = {
-                "x_gps", "y_gps",
-                "x_imu", "y_imu",
-                "x_fused", "y_fused",
-            }
-
-            if required_traj_cols.issubset(set(navigation_results.columns)):
+            if TRAJ_COLS.issubset(set(navigation_results.columns)):
                 plot_trajectories(
                     navigation_results,
                     save_figure=True,
                     show_plot=True,
                 )
-
-        elif config["nav_mode"] == "GPS_ONLY":
-            print("[INFO] Le tracé comparatif complet est ignoré en mode GPS_ONLY.")
-
-        elif config["nav_mode"] == "IMU_ONLY":
-            print("[INFO] Le tracé comparatif complet est ignoré en mode IMU_ONLY.")
+        else:
+            print(
+                f"[INFO] Le tracé comparatif complet est ignoré en mode {config['nav_mode']}."
+            )
 
     # =====================================================
     # 10. Affichage des vitesses estimées
     # =====================================================
     if config["show_plot"] and config["show_velocities"]:
-        required_vel_cols = {
-            "vx_imu", "vy_imu",
-            "vx_fused", "vy_fused",
-        }
-
-        if (
-            config["nav_mode"] == "FUSION"
-            and required_vel_cols.issubset(set(navigation_results.columns))
-        ):
+        if config["nav_mode"] == "FUSION" and VEL_COLS.issubset(set(navigation_results.columns)):
             plot_velocities(
                 navigation_results,
                 save_figure=True,
@@ -278,16 +277,9 @@ def main() -> None:
     # =====================================================
     # 11. Résumé des résultats de navigation
     # =====================================================
-    if {
-        "x_gps", "y_gps",
-        "x_imu", "y_imu",
-        "x_fused", "y_fused",
-    }.intersection(set(navigation_results.columns)):
+    if _has_any_columns(navigation_results, TRAJ_COLS):
         summary = summarize_navigation_results(navigation_results)
-
-        print("\n====================================")
-        print("RÉSUMÉ NAVIGATION")
-        print("====================================\n")
+        _print_section("RÉSUMÉ NAVIGATION")
         print(summary)
 
     # =====================================================
@@ -315,9 +307,7 @@ def main() -> None:
             scenario2_df["gps_available"]
         ].copy()
 
-        print("\n====================================")
-        print("SCÉNARIO 2 — STATISTIQUES")
-        print("====================================\n")
+        _print_section("SCÉNARIO 2 — STATISTIQUES")
 
         if scenario2_gps_phase.empty:
             print(

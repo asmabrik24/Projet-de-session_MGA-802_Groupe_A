@@ -1,11 +1,17 @@
+
 import os
 import pandas as pd
 
 from gps_imu_nav.pipeline import FusionPipeline
 
+# Tests unitaires du pipeline principal.
+# Ils vérifient la création des fichiers de sortie dans un dossier temporaire,
+# avec et sans fichier IMU disponible.
 
+# Vérifie que l'exécution complète du pipeline génère les fichiers CSV et Pickle attendus.
 def test_pipeline_run_creates_output_files(tmp_path):
-    # Création d'un faux projet
+    """Teste que le pipeline crée les fichiers de sortie principaux."""
+    # Création d'une structure de projet temporaire avec un jeu de données minimal.
     project_root = tmp_path
     data_dir = project_root / "données"
     data_dir.mkdir()
@@ -39,7 +45,7 @@ def test_pipeline_run_creates_output_files(tmp_path):
 
     pipeline = FusionPipeline()
 
-    # on force les chemins du pipeline vers le dossier temporaire
+    # Redirige les chemins internes du pipeline vers le dossier temporaire de test.
     pipeline.project_root = str(project_root)
     pipeline.base_path = str(data_dir)
     pipeline.path_gps = str(gps_path)
@@ -53,8 +59,9 @@ def test_pipeline_run_creates_output_files(tmp_path):
     assert output_csv.exists()
     assert output_pkl.exists()
 
-
+# Vérifie que le pipeline reste capable de produire un CSV même si le fichier IMU est absent.
 def test_pipeline_run_without_imu_still_creates_csv(tmp_path):
+    """Teste le comportement du pipeline lorsque les données IMU ne sont pas disponibles."""
     project_root = tmp_path
     data_dir = project_root / "données"
     data_dir.mkdir()
