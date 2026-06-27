@@ -6,27 +6,35 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+# Module de navigation GPS/IMU.
+# Il regroupe le chargement du dataset final, le calcul des trajectoires
+# GPS et IMU, ainsi qu'une fusion simple des deux sources.
 
+# Noms par défaut des fichiers de données et de sortie du module navigation.
 DEFAULT_NAVIGATION_OUTPUT_NAME = "navigation_outputs.pkl"
 DEFAULT_DATASET_NAME = "dataset_final.pkl"
 DEFAULT_DATA_DIR_NAME = "données"
 
 
+# Retourne la racine du projet pour construire les chemins d'accès par défaut.
 def get_project_root() -> Path:
     """Retourne la racine du projet à partir du dossier du module."""
     return Path(__file__).resolve().parent.parent
 
 
+# Retourne le dossier local contenant les données du projet.
 def get_data_dir() -> Path:
     """Retourne le dossier des données du projet."""
     return get_project_root() / DEFAULT_DATA_DIR_NAME
 
 
+# Retourne le chemin par défaut du dataset synchronisé utilisé pour la navigation.
 def get_default_dataset_path() -> Path:
     """Retourne le chemin par défaut du dataset synchronisé."""
     return get_data_dir() / DEFAULT_DATASET_NAME
 
 
+# Charge le dataset final à partir d'un chemin explicite ou du chemin par défaut du projet.
 def load_navigation_dataset(dataset_path: str | os.PathLike | None = None) -> pd.DataFrame:
     """
     Charge le dataset final au format Pickle.
@@ -42,6 +50,7 @@ def load_navigation_dataset(dataset_path: str | os.PathLike | None = None) -> pd
     return pd.read_pickle(path)
 
 
+# Convertit les coordonnées GPS globales en coordonnées locales en mètres.
 def _latlon_to_local_meters(
     latitude_deg: pd.Series,
     longitude_deg: pd.Series,
@@ -71,7 +80,8 @@ def _latlon_to_local_meters(
     })
 
 
-
+# Retourne une ligne vide entre fonctions de haut niveau
+# Convertit les timestamps absolus en temps relatif en secondes.
 def _prepare_time_seconds(data: pd.DataFrame) -> pd.Series:
     """
     Convertit la colonne timestamp en secondes relatives.
@@ -84,6 +94,7 @@ def _prepare_time_seconds(data: pd.DataFrame) -> pd.Series:
     return time_seconds
 
 
+# Extrait une vitesse initiale approximative depuis les colonnes GPS si elles existent.
 def _get_initial_velocity_from_gps(data: pd.DataFrame) -> tuple[float, float]:
     """
     Récupère une vitesse initiale approximative à partir des colonnes GPS
@@ -100,6 +111,7 @@ def _get_initial_velocity_from_gps(data: pd.DataFrame) -> tuple[float, float]:
     return vx0, vy0
 
 
+# Projette les accélérations du repère corps vers un repère navigation 2D.
 def _rotate_body_acceleration_to_navigation(ax_body: pd.Series, ay_body: pd.Series, yaw_deg: pd.Series | None) -> pd.DataFrame:
     """
     Projette les accélérations IMU du repère corps vers un repère navigation 2D
@@ -124,6 +136,7 @@ def _rotate_body_acceleration_to_navigation(ax_body: pd.Series, ay_body: pd.Seri
     })
 
 
+# Construit la trajectoire GPS seule en coordonnées locales et, si possible, les vitesses GPS.
 def compute_gps_trajectory(data: pd.DataFrame) -> pd.DataFrame:
     """
     Extrait la trajectoire GPS seule à partir du dataset final.
@@ -160,6 +173,7 @@ def compute_gps_trajectory(data: pd.DataFrame) -> pd.DataFrame:
     return gps_traj[output_columns]
 
 
+# Calcule une trajectoire IMU simple par intégration des accélérations filtrées.
 def compute_imu_trajectory(data: pd.DataFrame) -> pd.DataFrame:
     """
     Calcule une trajectoire IMU simple par double intégration
@@ -210,6 +224,7 @@ def compute_imu_trajectory(data: pd.DataFrame) -> pd.DataFrame:
 
     vx0, vy0 = _get_initial_velocity_from_gps(data)
 
+    # Intégration discrète des accélérations pour reconstruire vitesse et position.
     vx_values = []
     vy_values = []
     x_values = []
@@ -244,6 +259,7 @@ def compute_imu_trajectory(data: pd.DataFrame) -> pd.DataFrame:
     return imu_traj[["timestamp", "time_s", "x_imu", "y_imu", "vx_imu", "vy_imu"]]
 
 
+# Réalise une fusion simple GPS/IMU de type complémentaire à partir des trajectoires calculées.
 def compute_simple_fusion(
     gps_traj: pd.DataFrame,
     imu_traj: pd.DataFrame,
@@ -301,6 +317,7 @@ def compute_simple_fusion(
     vx_fused_values.append(vx_prev)
     vy_fused_values.append(vy_prev)
 
+    # Boucle de propagation/correction : l'IMU propage, le GPS recale.
     for i in range(1, len(merged)):
         dt = float(merged.loc[i, "time_s"] - merged.loc[i - 1, "time_s"])
         dt = max(0.0, min(dt, 1.0))
@@ -348,6 +365,7 @@ def compute_simple_fusion(
     return merged
 
 
+# Assemble les sorties de navigation GPS, IMU et fusionnées dans un seul DataFrame.
 def build_navigation_outputs(data: pd.DataFrame, alpha: float = 0.7) -> pd.DataFrame:
     """
     Retourne un DataFrame global contenant :
@@ -362,10 +380,7 @@ def build_navigation_outputs(data: pd.DataFrame, alpha: float = 0.7) -> pd.DataF
     return fused_traj
 
 
-"""
-Charge le dataset final, calcule les trajectoires GPS / IMU / fusionnées
-et retourne le DataFrame final.
-"""
+# Point d'entrée du module navigation : charge les données, calcule les trajectoires et peut sauvegarder la sortie.
 def run_navigation(
     dataset_path: str | os.PathLike | None = None,
     alpha: float = 0.7,

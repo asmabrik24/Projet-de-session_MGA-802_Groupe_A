@@ -1,9 +1,17 @@
+
 import pandas as pd
 import pytest
 
+# Fixtures partagées pour les tests unitaires.
+# Elles fournissent de petits jeux de données GPS et IMU
+# simples, cohérents et faciles à réutiliser.
 
+
+# Jeu de données GPS minimal pour tester le prétraitement,
+# le renommage/nettoyage des colonnes et la gestion des timestamps.
 @pytest.fixture
 def sample_gps_df():
+    """Retourne un petit DataFrame GPS de référence pour les tests."""
     return pd.DataFrame({
         "Timestamp": pd.to_datetime([
             "2025-01-01 00:00:00",
@@ -15,8 +23,11 @@ def sample_gps_df():
     })
 
 
+# Jeu de données IMU minimal pour tester le prétraitement,
+# les accélérations, les gyroscopes et la synchronisation temporelle.
 @pytest.fixture
 def sample_imu_df():
+    """Retourne un petit DataFrame IMU de référence pour les tests."""
     return pd.DataFrame({
         "Timestamp": pd.to_datetime([
             "2025-01-01 00:00:00",

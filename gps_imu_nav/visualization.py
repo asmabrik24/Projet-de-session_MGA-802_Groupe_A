@@ -1,14 +1,22 @@
 import os
 from pathlib import Path
 
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+# Module de visualisation des résultats de navigation GPS/IMU.
+# Il regroupe les fonctions de tracé des trajectoires, des vitesses,
+# des résumés finaux et des figures spécifiques au scénario 2.
 
+
+
+# Nom du dossier local utilisé pour enregistrer les figures générées.
 DEFAULT_FIGURES_DIR_NAME = "figures"
 
 
+ # Affiche ou ferme proprement une figure selon l'environnement d'exécution.
 def _safe_show_or_close(show_plot: bool) -> None:
     """
     Tente d'afficher la figure. Si le backend matplotlib de PyCharm échoue,
@@ -25,11 +33,13 @@ def _safe_show_or_close(show_plot: bool) -> None:
         plt.close()
 
 
+ # Retourne la racine du projet pour construire les chemins de sortie.
 def get_project_root() -> Path:
     """Retourne la racine du projet à partir du dossier du module."""
     return Path(__file__).resolve().parent.parent
 
 
+ # Crée si nécessaire le dossier de sauvegarde des figures.
 def get_figures_dir() -> Path:
     """Retourne le dossier de sortie des figures."""
     figures_dir = get_project_root() / DEFAULT_FIGURES_DIR_NAME
@@ -37,6 +47,7 @@ def get_figures_dir() -> Path:
     return figures_dir
 
 
+ # Vérifie que les colonnes minimales requises pour les figures principales sont présentes.
 def validate_navigation_results(navigation_results: pd.DataFrame) -> None:
     """Vérifie que les colonnes minimales nécessaires aux graphiques existent."""
     required = ["x_gps", "y_gps", "x_imu", "y_imu", "x_fused", "y_fused"]
@@ -45,6 +56,7 @@ def validate_navigation_results(navigation_results: pd.DataFrame) -> None:
         raise ValueError(f"Colonnes manquantes pour la visualisation : {missing}")
 
 
+ # Génère deux figures : une vue utile GPS/fusion et une vue complète avec dérive IMU.
 def plot_trajectories(
     navigation_results: pd.DataFrame,
     save_figure: bool = True,
@@ -89,6 +101,7 @@ def plot_trajectories(
         label="Arrivée GPS",
     )
 
+    # Calcule des bornes d'affichage centrées sur les trajectoires GPS et fusionnées.
     x_focus = pd.concat([
         navigation_results["x_gps"],
         navigation_results["x_fused"],
@@ -163,6 +176,7 @@ def plot_trajectories(
     return focused_output_path
 
 
+ # Génère une figure dédiée à la trajectoire GPS seule pour mieux visualiser la référence.
 def plot_gps_trajectory_only(
     navigation_results: pd.DataFrame,
     save_figure: bool = True,
@@ -218,6 +232,7 @@ def plot_gps_trajectory_only(
     return final_output_path
 
 
+ # Génère la figure des vitesses IMU et fusionnées en fonction du temps.
 def plot_velocities(
     navigation_results: pd.DataFrame,
     save_figure: bool = True,
@@ -258,6 +273,7 @@ def plot_velocities(
     return final_output_path
 
 
+ # Construit un résumé tabulaire des positions finales selon les modes disponibles.
 def summarize_navigation_results(navigation_results: pd.DataFrame) -> pd.DataFrame:
     """
     Retourne un tableau résumé des positions finales pour les modes réellement disponibles.
@@ -289,6 +305,9 @@ def summarize_navigation_results(navigation_results: pd.DataFrame) -> pd.DataFra
     summary = pd.DataFrame(available_modes)
     return summary
 
+
+
+ # Génère la trajectoire 2D du scénario 2 avec indication du point de panne GPS.
 def plot_scenario2_trajectory(
     scenario2_df: pd.DataFrame,
     outage_start_s: float = 30.0,
@@ -315,6 +334,7 @@ def plot_scenario2_trajectory(
         markersize=2,
     )
 
+    # Sépare visuellement la phase GPS+IMU de la phase IMU seule après panne.
     mask_fusion = df["gps_available"]
     mask_imu = ~df["gps_available"]
 
@@ -364,6 +384,7 @@ def plot_scenario2_trajectory(
     return final_output_path
 
 
+ # Génère les figures d'évolution de l'erreur et de la dérive après la panne GPS.
 def plot_scenario2_drift(
     scenario2_df: pd.DataFrame,
     save_figure: bool = True,
@@ -379,6 +400,7 @@ def plot_scenario2_drift(
 
     fig, axes = plt.subplots(2, 1, figsize=(10, 8))
 
+    # Sépare les échantillons avant et après la panne GPS pour l'analyse d'erreur.
     mask_fusion = df["gps_available"]
     mask_imu = ~df["gps_available"]
 
@@ -415,6 +437,7 @@ def plot_scenario2_drift(
     return final_output_path
 
 
+ # Génère les états de navigation du scénario 2 : vitesse horizontale et cap estimé.
 def plot_scenario2_navigation_states(
     scenario2_df: pd.DataFrame,
     outage_start_s: float = 30.0,
@@ -435,6 +458,7 @@ def plot_scenario2_navigation_states(
     else:
         raise ValueError("Colonnes vx_imu et vy_imu requises pour la vitesse horizontale.")
 
+    # Utilise le yaw si disponible, sinon approxime un cap à partir de la trajectoire.
     if "yaw" in df.columns:
         df["heading_plot"] = df["yaw"]
     else:

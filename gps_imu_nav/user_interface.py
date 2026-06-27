@@ -5,9 +5,15 @@ user_interface.py
 Gestion complète des saisies et des exceptions.
 """
 
+
 from __future__ import annotations
 
+# Module d'interface utilisateur en ligne de commande.
+# Il centralise la lecture, la validation et le résumé des paramètres
+# nécessaires à l'analyse GPS/IMU.
 
+
+ # Classe responsable des interactions terminal avec l'utilisateur.
 class UserInterface:
     """
     Interface utilisateur en ligne de commande.
@@ -38,6 +44,7 @@ class UserInterface:
         if total_duration_s is not None:
             print(f"[INFO] Durée disponible de la trajectoire : {total_duration_s:.3f} s")
 
+        # Lecture et validation de la fenêtre temporelle d'analyse.
         # --------------------------------------------------
         # Fenêtre temporelle
         # --------------------------------------------------
@@ -90,6 +97,7 @@ class UserInterface:
 
             break
 
+        # Paramètres du scénario de panne GPS à appliquer pendant l'analyse.
         # --------------------------------------------------
         # Simulation de panne GPS
         # --------------------------------------------------
@@ -155,6 +163,7 @@ class UserInterface:
 
             break
 
+        # Choix du mode de navigation à étudier.
         # --------------------------------------------------
         # Mode de navigation
         # --------------------------------------------------
@@ -182,6 +191,7 @@ class UserInterface:
 
         print(f"[INFO] Mode sélectionné : {nav_mode}")
 
+        # Lecture du coefficient de fusion uniquement si le mode fusion est activé.
         # --------------------------------------------------
         # Paramètre Alpha
         # --------------------------------------------------
@@ -205,6 +215,7 @@ class UserInterface:
                     "[ERREUR] Alpha doit être compris entre 0 et 1."
                 )
 
+        # Choix des sorties graphiques à afficher dans l'exécution principale.
         # --------------------------------------------------
         # Affichage
         # --------------------------------------------------
@@ -236,6 +247,7 @@ class UserInterface:
             outage_duration = 0.0
             print("[INFO] Les paramètres de panne GPS sont ignorés hors mode FUSION.")
 
+        # Regroupe tous les paramètres validés dans un dictionnaire unique.
         # --------------------------------------------------
         # Configuration finale
         # --------------------------------------------------
@@ -257,10 +269,12 @@ class UserInterface:
 
         return config
 
+    # Méthodes utilitaires internes pour l'affichage du résumé et la lecture sécurisée des entrées.
     # =====================================================
     # Fonctions privées
     # =====================================================
 
+    # Affiche un résumé lisible de la configuration choisie par l'utilisateur.
     def _display_summary(self, config: dict) -> None:
 
         print("\n====================================")
@@ -273,6 +287,7 @@ class UserInterface:
 
         print("====================================")
 
+    # Lit une chaîne de caractères avec gestion d'une valeur par défaut.
     def _read_string(
         self,
         label: str,
@@ -295,6 +310,7 @@ class UserInterface:
             except EOFError:
                 raise
 
+    # Lit un nombre flottant et redemande la saisie en cas d'erreur.
     def _read_float(
         self,
         label: str,
@@ -326,6 +342,7 @@ class UserInterface:
             except EOFError:
                 raise
 
+    # Lit une réponse booléenne utilisateur sous forme oui/non.
     def _read_bool(
         self,
         label: str,
@@ -361,6 +378,7 @@ class UserInterface:
             except EOFError:
                 raise
 
+    # Lit un entier borné dans un intervalle autorisé.
     def _read_int_range(
         self,
         label: str,
